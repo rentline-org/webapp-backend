@@ -2,13 +2,13 @@
 # Stage 1: Build stage
 FROM php:8.2-fpm-alpine AS builder
 
-# Install system dependencies and PHP extensions
 RUN apk add --no-cache \
     build-base \
     freetype-dev \
     libjpeg-turbo-dev \
     libpng-dev \
     libzip-dev \
+    libpq-dev \
     zip \
     unzip \
     curl \
@@ -16,7 +16,7 @@ RUN apk add --no-cache \
     && docker-php-ext-install -j$(nproc) \
         bcmath \
         gd \
-        pdo_mysql \
+        pdo_pgsql \
         zip \
         pcntl \
         posix \
@@ -51,12 +51,12 @@ RUN chown -R www-data:www-data /var/www \
 # Stage 2: Production stage
 FROM php:8.2-fpm-alpine AS production
 
-# Install runtime dependencies and PHP extensions
 RUN apk add --no-cache \
     freetype \
     libjpeg-turbo \
     libpng \
     libzip \
+    libpq \
     curl \
     && apk add --no-cache --virtual .build-deps \
         build-base \
@@ -64,11 +64,12 @@ RUN apk add --no-cache \
         libjpeg-turbo-dev \
         libpng-dev \
         libzip-dev \
+        libpq-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         bcmath \
         gd \
-        pdo_mysql \
+        pdo_pgsql \
         zip \
         pcntl \
         posix \
@@ -123,10 +124,8 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/api/healthz || exit 1
+    CMD curl -f "http://localhost:${PORT:-8000}/api/healthz" || exit 1
 
-# Set entrypoint
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
-# Start Laravel's built-in server
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+CMD ["sh", "-lc", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
