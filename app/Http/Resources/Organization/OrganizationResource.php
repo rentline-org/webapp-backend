@@ -24,7 +24,7 @@ class OrganizationResource extends JsonResource
         ];
 
         if ($isMediaLoaded) {
-            $data['avatar'] = $this->getFirstMediaUrl('avatar')->getUrl();
+            $data['avatar'] = $this->getFirstMediaUrl('avatar');
         }
 
         return $data;

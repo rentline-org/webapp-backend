@@ -17,6 +17,7 @@ return [
     'login.unverified' => 'Your Email has not been verified! It is not possible to login.',
     'login.lockout' => 'You have tried to login with wrong information many times! Try again after a while.',
     'login.success' => 'Login is successful.',
+    'register.success' => 'Your account has been created successfully.',
     'password.current.wrong' => 'Wrong current password! Please try again with the correct password.',
     'permission.delete.success' => 'Permission deleted successfully.',
     'permission.delete.fail' => 'Permission delete failed.',

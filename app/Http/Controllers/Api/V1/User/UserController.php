@@ -20,7 +20,6 @@ use App\Models\User;
 use App\Services\Organization\OrganizationService;
 use App\Services\User\UserService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
@@ -219,15 +218,9 @@ class UserController extends Controller
     public function getProfileData(Request $request)
     {
 
-        $user = User::findOrFail($request->user()->id)->load('roles', 'media');
+        $user = $request->user()->load('roles', 'media', 'organizations');
+
         Gate::authorize('view', $user);
-
-        $token = Auth::user()->currentAccessToken();
-        $organization = $token?->organization_id
-            ? $this->organizationService->getOrganization($token->organization_id)
-            : null;
-
-        $user->setRelation('activeOrganization', $organization);
 
         return UserResource::make($user);
     }

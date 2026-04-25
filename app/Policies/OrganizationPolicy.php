@@ -9,7 +9,7 @@ class OrganizationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isSuperAdmin() || $user->organizations()->exists();
+        return $user->isSuperAdmin() || $user->isLandlord();
     }
 
     public function view(User $user, Organization $organization): bool

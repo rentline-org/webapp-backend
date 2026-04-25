@@ -8,10 +8,13 @@ use App\Enums\UserStatus;
 use App\Exceptions\ApiException;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
+use App\Services\Organization\OrganizationService;
 use App\Traits\RateLimiterTrait;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\PersonalAccessToken;
 use LogicException;
@@ -35,6 +38,7 @@ class AuthService
 
     public function __construct(
         protected OtpService $otpService,
+        protected OrganizationService $organizationService
     ) {}
 
     public function createAccount(RegisterRequest $request)
@@ -104,6 +108,8 @@ class AuthService
         $token = $user->createToken($this->generateTokenKey($user->id, $device) . $user->id)->plainTextToken;
         $this->clearLoginAttempts($request);
         $this->authenticated($user, $device);
+
+        $user->load('organizations');
 
         return [
             'user' => $user,
@@ -184,23 +190,42 @@ class AuthService
     }
 
     // After login is finished select an organization and update the user's existing personal access token
-    public function selectOrganization(User $user, int $organizationId): void
+    public function selectOrganization(User $user, int $organizationId): array
     {
-        if (! $user->organizations()->where('id', $organizationId)->exists()) {
-            throw new \Exception('User does not belong to this organization.');
-        }
-
         $token = $user->currentAccessToken();
 
-        if (! $token || ! isset($token->id)) {
+        if (! $token) {
             throw new LogicException('No active token found for the user.');
         }
 
-        PersonalAccessToken::query()
-            ->whereKey($token->id)
-            ->update([
+        if (! $user->organizations()->whereKey($organizationId)->exists()) {
+            throw new AuthorizationException('User does not belong to this organization.');
+        }
+
+        $tokenModel = PersonalAccessToken::query()->findOrFail($token->id);
+
+        $currentOrgId = $tokenModel->organization_id;
+
+        if ((int) $currentOrgId === $organizationId) {
+            return [
                 'organization_id' => $organizationId,
-            ]);
+                'active_organization' => $this->organizationService->getOrganization($organizationId),
+                'changed' => false,
+            ];
+        }
+
+        DB::transaction(function () use ($tokenModel, $organizationId): void {
+            $tokenModel->organization_id = $organizationId;
+            $tokenModel->save();
+        });
+
+        $tokenModel->refresh();
+
+        return [
+            'organization_id' => $tokenModel->organization_id,
+            'active_organization' => $this->organizationService->getOrganization($tokenModel->organization_id),
+            'changed' => true,
+        ];
     }
 
     /**

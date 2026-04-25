@@ -5,24 +5,31 @@ namespace App\Models\Scopes;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
-use Illuminate\Support\Facades\Auth;
 
 class OrganizationScope implements Scope
 {
-    /** Apply the scope to a given Eloquent query builder. */
+    /**
+     * Apply the scope to a given Eloquent query builder.
+     *
+     * @param Builder<Model> $builder
+     */
     public function apply(Builder $builder, Model $model): void
     {
-        $orgId = Auth::user()?->currentAccessToken()?->organization_id;
-        $isSuperAdmin = Auth::user()?->isSuperAdmin();
+        $user = request()->user();
 
-        if ($orgId && ! $isSuperAdmin) {
-            /** @var Model $modelInstance */
-            $modelInstance = $builder->getModel();
-
-            $builder->where(
-                $modelInstance->getTable() . '.organization_id',
-                $orgId
-            );
+        if (! $user || $user->isSuperAdmin()) {
+            return;
         }
+
+        $orgId = request()->attributes->get('active_organization_id');
+
+        if (! $orgId) {
+            return;
+        }
+
+        $builder->where(
+            $model->getTable() . '.organization_id',
+            $orgId
+        );
     }
 }
