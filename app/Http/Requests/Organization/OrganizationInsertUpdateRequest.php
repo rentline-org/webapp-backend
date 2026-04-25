@@ -48,7 +48,7 @@ class OrganizationInsertUpdateRequest extends FormRequest
             ],
 
             // Optional frontend-controlled flags
-            'is_active' => ['sometimes', 'boolean'],
+            'setActive' => ['sometimes', 'boolean'],
 
             // Media
             'avatar' => ['nullable', 'image', 'max:2048'],
