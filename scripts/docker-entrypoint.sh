@@ -1,69 +1,37 @@
 #!/bin/sh
-
-# Docker entrypoint script for Laravel application
 set -e
 
 echo "🚀 Starting Laravel application..."
 
-# Wait for database to be ready with timeout
-echo "⏳ Waiting for database connection..."
+# Ensure we're in the correct directory
+cd /var/www
 
-# Use our custom database wait script if available, otherwise fallback to simpler check
-if [ -f "/var/www/scripts/wait-for-db.sh" ]; then
-    /var/www/scripts/wait-for-db.sh
-else
-    MAX_ATTEMPTS=30
-    ATTEMPT=0
+# Fix permissions (safe no-op if already correct)
+echo "🔧 Setting permissions..."
+chown -R www-data:www-data storage bootstrap/cache || true
+chmod -R 775 storage bootstrap/cache || true
 
-    # Simple database connection test using PHP
-    until php -r "
-        try {
-            \$host = getenv('DB_HOST') ?: 'db';
-            \$port = getenv('DB_PORT') ?: '3306';
-            \$database = getenv('DB_DATABASE') ?: 'laravel';
-            \$username = getenv('DB_USERNAME') ?: 'laravel';
-            \$password = getenv('DB_PASSWORD') ?: 'secret';
-            \$pdo = new PDO(\"mysql:host=\$host;port=\$port;dbname=\$database\", \$username, \$password);
-            \$pdo->query('SELECT 1');
-            exit(0);
-        } catch (Exception \$e) {
-            exit(1);
-        }
-    " > /dev/null 2>&1; do
-        ATTEMPT=$((ATTEMPT + 1))
-        if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
-            echo "❌ Database connection failed after $MAX_ATTEMPTS attempts (60 seconds)"
-            echo "Please check your database configuration and ensure the database container is running"
-            echo "Database configuration:"
-            echo "  Host: ${DB_HOST:-db}"
-            echo "  Port: ${DB_PORT:-3306}"
-            echo "  Database: ${DB_DATABASE:-laravel}"
-            echo "  Username: ${DB_USERNAME:-laravel}"
-            exit 1
-        fi
-        echo "🔄 Database not ready, waiting 2 seconds... (attempt $ATTEMPT/$MAX_ATTEMPTS)"
-        sleep 2
-    done
-    
-    echo "✅ Database connection established"
-fi
-
-# Link storage
+# Link storage (ignore if already linked)
 echo "🔧 Linking storage..."
-php artisan storage:link
+php artisan storage:link || true
 
-# Run database migrations
-echo "🔧 Running database migrations..."
-php artisan migrate --force
+# Clear stale caches (important when using Docker layers)
+echo "🧹 Clearing caches..."
+php artisan config:clear || true
+php artisan route:clear || true
+php artisan cache:clear || true
+php artisan view:clear || true
 
-# Cache configuration and routes for better performance
-echo "⚡ Optimizing application..."
-php artisan optimize: || echo "⚠️ optimization failed, continuing..."
+# Run migrations (non-blocking fallback)
+echo "🗄️ Running migrations..."
+php artisan migrate --force || echo "⚠️ Migration failed, continuing..."
+
+# Rebuild optimized caches
+echo "⚡ Caching config and routes..."
+php artisan config:cache || true
+php artisan route:cache || true
 
 echo "🎉 Laravel application is ready!"
 
-# Documentation generation
-php artisan scribe:generate
-
-# Execute the main command
+# Start the main container process
 exec "$@"
