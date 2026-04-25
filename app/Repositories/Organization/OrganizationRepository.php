@@ -33,11 +33,9 @@ class OrganizationRepository implements OrganizationRepositoryInterface
     }
 
     /** {@inheritDoc} */
-    public function create(OrganizationDTO $data): Organization
+    public function create(array $data): Organization
     {
-        return DB::transaction(function () use ($data) {
-            return Organization::create($data->toArray());
-        });
+        return DB::transaction(fn () => Organization::create($data));
     }
 
     /** {@inheritDoc} */

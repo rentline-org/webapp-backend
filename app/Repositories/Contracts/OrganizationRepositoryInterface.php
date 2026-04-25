@@ -11,7 +11,7 @@ interface OrganizationRepositoryInterface
 
     public function findById(int $id): ?Organization;
 
-    public function create(OrganizationDTO $data): Organization;
+    public function create(array $data): Organization;
 
     public function update(Organization $organization, OrganizationDTO $data): Organization;
 

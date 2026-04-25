@@ -6,6 +6,7 @@ use App\DTOs\Organization\OrganizationDTO;
 use App\Models\Organization;
 use App\Models\User;
 use App\Repositories\Contracts\OrganizationRepositoryInterface;
+use DomainException;
 use Exception;
 
 class OrganizationService
@@ -32,16 +33,17 @@ class OrganizationService
     public function createOrganization(User $user, OrganizationDTO $data): Organization
     {
         if ($user->isTenant()) {
-            throw new Exception('Tenants cannot create organizations.');
+            throw new DomainException('Tenants cannot create organizations.');
         }
 
-        $newOrganization = $this->organizationRepository->create($data);
+        $payload = [...$data->toArray(), 'owner_id' => $user->id, 'trial_ends_at' => now()->addDays(14)];
+        $organization = $this->organizationRepository->create($payload);
 
         if ($user->isLandlord()) {
-            $this->organizationRepository->assignUserToOrganization($user->id, $newOrganization->id);
+            $this->organizationRepository->assignUserToOrganization($user->id, $organization->id);
         }
 
-        return $newOrganization;
+        return $organization;
     }
 
     public function updateOrganization(User $user, OrganizationDTO $data): Organization

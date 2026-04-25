@@ -236,7 +236,7 @@ class UserController extends Controller
      */
     public function updateProfile(UserProfileUpdateRequest $request)
     {
-        $user = User::findOrFail(auth()->id());
+        $user = User::findOrFail($request->user()->id);
         Gate::authorize('update', $user);
         $data = UserDTO::fromRequest($request, $user);
         $updatedUser = $this->userService->updateUserData($data, $user, true);
@@ -255,8 +255,9 @@ class UserController extends Controller
      */
     public function changeProfilePassword(UserPasswordUpdateRequest $request)
     {
-        $user = User::findOrFail(auth()->id());
+        $user = User::findOrFail($request->user()->id);
         Gate::authorize('update', $user);
+
         $updatedUser = $this->userService->updateUserPassword(
             $user,
             $request->password,
@@ -277,7 +278,7 @@ class UserController extends Controller
      */
     public function updateProfileAvatar(UserProfileAvatarUpdateRequest $request)
     {
-        $user = User::findOrFail(auth()->id());
+        $user = User::findOrFail($request->user()->id);
         Gate::authorize('update', $user);
         $updatedUser = $this->userService->updateUserAvatar($user, $request->avatar);
 

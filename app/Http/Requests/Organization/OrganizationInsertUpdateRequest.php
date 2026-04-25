@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Organization;
 
+use App\Enums\TaxIDType;
 use App\Models\Organization;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,6 @@ class OrganizationInsertUpdateRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
 
-            'address' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
 
             'email' => [
@@ -33,15 +33,25 @@ class OrganizationInsertUpdateRequest extends FormRequest
 
             'website' => ['nullable', 'url', 'max:255'],
 
-            'number_of_properties' => [
+            // Address
+            'country' => ['required', 'string', 'size:2'], // ISO code (BR, DE, etc)
+            'state' => ['nullable', 'string', 'max:255'],
+            'city' => ['required', 'string', 'max:255'],
+            'postal_code' => ['required', 'string', 'max:20'],
+            'address_line' => ['required', 'string', 'max:255'],
+
+            // Tax
+            'tax_id' => ['nullable', 'string', 'max:50'],
+            'tax_id_type' => [
                 'nullable',
-                'integer',
-                'min:1',
+                Rule::in(array_column(TaxIDType::cases(), 'value')),
             ],
 
-            // avatar (Spatie MediaLibrary)
+            // Optional frontend-controlled flags
+            'is_active' => ['sometimes', 'boolean'],
+
+            // Media
             'avatar' => ['nullable', 'image', 'max:2048'],
-            'setActive' => 'boolean',
         ];
     }
 }
