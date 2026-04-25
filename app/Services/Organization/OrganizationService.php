@@ -11,6 +11,8 @@ use Exception;
 
 class OrganizationService
 {
+    protected ?Organization $resolvedActiveOrg = null;
+
     /**
      * __construct
      *

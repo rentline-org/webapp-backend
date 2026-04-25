@@ -160,6 +160,8 @@ class AuthService
         $this->clearLoginAttempts($request);
         $this->authenticated($user, $device);
 
+        $user->load(['media', 'roles', 'organizations']);
+
         return [
             'user' => $user,
             'token' => $token,
