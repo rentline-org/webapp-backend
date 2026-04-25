@@ -24,7 +24,7 @@ php artisan view:clear || true
 
 # Run migrations (non-blocking fallback)
 echo "🗄️ Running migrations..."
-php artisan migrate --force || echo "⚠️ Migration failed, continuing..."
+php artisan migrate --force --seed || echo "⚠️ Migration failed, continuing..."
 
 # Rebuild optimized caches
 echo "⚡ Caching config and routes..."
