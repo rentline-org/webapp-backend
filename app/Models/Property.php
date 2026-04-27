@@ -5,10 +5,13 @@ namespace App\Models;
 use App\Enums\PropertyType;
 use App\Helpers\OrganizationHelper;
 use App\Models\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Property extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'organization_id',
         'slug',
@@ -24,6 +27,7 @@ class Property extends Model
         'is_furnished',
         'rent_price',
         'sale_price',
+        'buy_price',
         'bedrooms',
         'bathrooms',
         'square_feet',
@@ -40,6 +44,7 @@ class Property extends Model
         'is_pet_friendly' => 'boolean',
         'rent_price' => 'decimal:2',
         'sale_price' => 'decimal:2',
+        'buy_price' => 'decimal:2',
         'square_feet' => 'decimal:2',
         'amenities' => 'array',
         'sale_types' => 'array',

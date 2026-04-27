@@ -76,7 +76,10 @@ class OrganizationRepository implements OrganizationRepositoryInterface
     {
         $user = User::findOrFail($userId);
 
-        return $user->organizations()->get()->all();
+        return $user->organizations()
+            ->withCount('properties')
+            ->get()
+            ->all();
     }
 
     /** {@inheritDoc} */

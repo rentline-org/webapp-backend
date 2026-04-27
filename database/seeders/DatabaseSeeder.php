@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\Organization;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -19,11 +19,12 @@ class DatabaseSeeder extends Seeder
         $this->call(PermissionSeeder::class);
         $this->call(RoleSeeder::class);
         $this->call(UserSeeder::class);
+        $this->call(OrganizationSeeder::class);
+        $this->call(PropertySeeder::class);
 
-        if (app()->environment('local', 'development')) {
-            // random user for  development environment
-            User::factory(10)->create();
-        }
+        // if (app()->environment('local', 'development')) {
+        //     Organization::factory()->count(2)->create();
+        // }
 
         Model::reguard(); // Enable mass assignment
     }

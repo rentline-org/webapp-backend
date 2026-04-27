@@ -30,12 +30,13 @@ return new class extends Migration
                 array_map(fn ($case) => $case->value, PropertyType::cases())
             )->default(PropertyType::HOUSE->value);
 
-            // Used when the property itself is the listing.
-            // If this property has units, these can stay null and unit-level data wins.
             $table->boolean('is_available')->default(true);
             $table->boolean('is_furnished')->default(false);
             $table->decimal('rent_price', 10, 2)->nullable();
             $table->decimal('sale_price', 10, 2)->nullable();
+
+            $table->decimal('buy_price', 10, 2)->nullable();
+
             $table->integer('bedrooms')->nullable();
             $table->integer('bathrooms')->nullable();
             $table->decimal('square_feet', 10, 2)->nullable();
@@ -44,7 +45,6 @@ return new class extends Migration
             $table->date('available_from')->nullable();
             $table->boolean('is_pet_friendly')->default(false);
 
-            // Keep only if you truly need multiple sale modes.
             $table->json('sale_types')->nullable();
 
             $table->timestamps();

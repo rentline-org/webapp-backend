@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\OrganizationPlan;
 use App\Enums\TaxIDType;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,7 +15,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Organization extends Model implements HasMedia
 {
-    use InteractsWithMedia, SoftDeletes;
+    use HasFactory, InteractsWithMedia, SoftDeletes;
 
     protected $fillable = [
         'title',
@@ -63,6 +64,11 @@ class Organization extends Model implements HasMedia
     public function contacts(): HasMany
     {
         return $this->hasMany(Contact::class);
+    }
+
+    public function properties(): HasMany
+    {
+        return $this->hasMany(Property::class);
     }
 
     public function registerMediaCollections(): void

@@ -14,7 +14,7 @@ return [
     'login.invalid.otp' => 'OTP is not correct.',
     'login.expired.otp' => 'The OTP has expired.',
     'login.inactive' => 'Your account is not active! It is not possible to login.',
-    'login.unverified' => 'Your Email has not been verified! It is not possible to login.',
+    'login.unverified' => 'Your Email has not been verified! Check your email for a code.',
     'login.lockout' => 'You have tried to login with wrong information many times! Try again after a while.',
     'login.success' => 'Login is successful.',
     'register.success' => 'Your account has been created successfully.',

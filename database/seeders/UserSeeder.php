@@ -10,39 +10,63 @@ use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
-    /** Run the database seeds. */
     public function run(): void
     {
-
-        // superadmin
-        $superAdmin = new User;
-        $superAdmin->name = 'Super Admin';
-        $superAdmin->user_name = 'super.admin';
-        $superAdmin->email = 'superadmin@ims.com';
-        $superAdmin->email_verified_at = now();
-        $superAdmin->phone = '01700000000';
-        $superAdmin->phone_verified_at = now();
-        $superAdmin->password = Hash::make(123456);
-        $superAdmin->is_active = UserStatus::ACTIVE;
-        $superAdmin->last_login_at = now();
-
-        $superAdmin->save();
+        // Super Admin
+        $superAdmin = User::create([
+            'name' => 'Super Admin',
+            'user_name' => 'super.admin',
+            'email' => 'superadmin@ims.com',
+            'email_verified_at' => now(),
+            'phone' => '01700000000',
+            'phone_verified_at' => now(),
+            'password' => Hash::make('123456'),
+            'is_active' => UserStatus::ACTIVE,
+            'last_login_at' => now(),
+        ]);
 
         $superAdmin->assignRole(UserRole::SUPER_ADMIN);
 
-        $dannyk = new User;
-        $dannyk->name = 'Danny K';
-        $dannyk->user_name = 'danny.k';
-        $dannyk->email = 'kruger.dkk@gmail.com';
-        $dannyk->email_verified_at = now();
-        $dannyk->phone = '5545999955224';
-        $dannyk->phone_verified_at = now();
-        $dannyk->password = Hash::make('qwerty123');
-        $dannyk->is_active = UserStatus::ACTIVE;
-        $dannyk->last_login_at = now();
+        // Danny (landlord)
+        $danny = User::create([
+            'first_name' => 'Danny',
+            'last_name' => 'K',
+            'name' => 'Danny K',
+            'user_name' => 'danny.k',
+            'email' => 'kruger.dkk@gmail.com',
+            'email_verified_at' => now(),
+            'phone' => '5545999955224',
+            'phone_verified_at' => now(),
+            'password' => Hash::make('qwerty123'),
+            'is_active' => UserStatus::ACTIVE,
+            'last_login_at' => now(),
+        ]);
 
-        $dannyk->save();
+        $danny->assignRole(UserRole::LANDLORD);
 
-        $dannyk->assignRole(UserRole::LANDLORD);
+        // Extra users
+        $verifiedUser = User::factory()->create();
+        $verifiedUser->assignRole(UserRole::LANDLORD);
+
+        echo "\n\nCreated verified user:{$verifiedUser->email}\n\n";
+
+        $unverifiedUser = User::create([
+            'first_name' => 'Kai',
+            'last_name' => 'Kruger',
+            'name' => 'Kai Kruger',
+            'user_name' => 'kai.kruger',
+            'email' => 'danniellkkruger@gmail.com',
+            'email_verified_at' => null,
+            'phone' => '5545999955334',
+            'phone_verified_at' => null,
+            'password' => Hash::make('qwerty123'),
+            'is_active' => UserStatus::ACTIVE,
+            'last_login_at' => now(),
+
+        ]);
+
+        $unverifiedUser->assignRole(UserRole::LANDLORD);
+
+        echo "\nCreated unverified user:{$unverifiedUser->email}\n\n";
     }
 }

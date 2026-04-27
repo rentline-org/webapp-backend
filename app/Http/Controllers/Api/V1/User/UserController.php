@@ -218,7 +218,14 @@ class UserController extends Controller
     public function getProfileData(Request $request)
     {
 
-        $user = $request->user()->load('roles', 'media', 'organizations');
+        $user = $request->user()->load([
+            'roles',
+            'media',
+            'organizations' => fn ($query) => $query->withCount([
+                'properties as properties_count' => fn ($q) => $q->withoutGlobalScopes(),
+            ]),
+        ]);
+        // ->loadCount('organizations.properties');
 
         Gate::authorize('view', $user);
 

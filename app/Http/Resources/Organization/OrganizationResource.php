@@ -20,6 +20,7 @@ class OrganizationResource extends JsonResource
 
         $data = [
             ...parent::toArray($request),
+            'properties_count' => $this->whenCounted('properties'),
             'users' => UserResource::collection($this->whenLoaded('users')),
         ];
 

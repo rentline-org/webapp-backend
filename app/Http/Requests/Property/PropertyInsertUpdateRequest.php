@@ -43,6 +43,7 @@ class PropertyInsertUpdateRequest extends FormRequest
             // Pricing
             'rent_price' => ['nullable', 'numeric', 'min:0'],
             'sale_price' => ['nullable', 'numeric', 'min:0'],
+            'buy_price' => ['nullable', 'numeric', 'min:0'],
 
             // Property details
             'bedrooms' => ['nullable', 'integer', 'min:0'],

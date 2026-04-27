@@ -244,11 +244,18 @@ class AuthService
         }
 
         if (($config['check_email_verified'] ?? true) && ! $user->email_verified_at) {
-            $this->throwLoginError(self::AUTH_ERROR_UNVERIFIED);
+            // $this
+            $this->otpService->sendOtp($user);
+            $this->throwLoginError(self::AUTH_ERROR_UNVERIFIED, [
+                'email' => $user->email,
+            ]);
         }
 
         if (($config['check_phone_verified'] ?? false) && ! $user->phone_verified_at) {
-            $this->throwLoginError(self::AUTH_ERROR_UNVERIFIED);
+            $this->throwLoginError(self::AUTH_ERROR_UNVERIFIED, [
+                // 'email' => $user->email,
+                'phone' => $user->phone,
+            ]);
         }
     }
 
@@ -308,7 +315,7 @@ class AuthService
      *
      * @throws ApiException
      */
-    protected function throwLoginError(string $errorCode): void
+    protected function throwLoginError(string $errorCode, array $additional_data = []): void
     {
         $responseCode = Response::HTTP_BAD_REQUEST;
 
@@ -336,7 +343,8 @@ class AuthService
             $responseCode,
             $errorCode,
             $errorMessage,
-            __('messages.login.fail.general')
+            __('messages.login.fail.general'),
+            $additional_data
         );
     }
 

@@ -23,6 +23,7 @@ class PropertyDTO
         public bool $is_furnished,
         public ?float $rent_price,
         public ?float $sale_price,
+        public ?float $buy_price,
         public ?int $bedrooms,
         public ?int $bathrooms,
         public ?float $square_feet,
@@ -56,6 +57,7 @@ class PropertyDTO
 
             rent_price: $request->input('rent_price', $existing?->rent_price),
             sale_price: $request->input('sale_price', $existing?->sale_price),
+            buy_price: $request->input('buy_price', $existing?->buy_price),
 
             bedrooms: $request->input('bedrooms', $existing?->bedrooms),
             bathrooms: $request->input('bathrooms', $existing?->bathrooms),
@@ -91,6 +93,7 @@ class PropertyDTO
             'is_furnished' => $this->is_furnished,
             'rent_price' => $this->rent_price,
             'sale_price' => $this->sale_price,
+            'buy_price' => $this->buy_price,
             'bedrooms' => $this->bedrooms,
             'bathrooms' => $this->bathrooms,
             'square_feet' => $this->square_feet,

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
@@ -37,7 +37,7 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'phone_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('123456'), // development friendly password
+            'password' => static::$password ??= Hash::make('qwerty123'), // development friendly password
             'remember_token' => Str::random(10),
         ];
     }
