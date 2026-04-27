@@ -2,12 +2,17 @@
 
 namespace App\Helpers;
 
-use Illuminate\Support\Facades\Auth;
-
 class OrganizationHelper
 {
-    public static function currentOrganizationId()
+    protected ?int $organizationId = null;
+
+    public function set(?int $id): void
     {
-        return Auth::user()?->currentAccessToken()?->organization_id;
+        $this->organizationId = $id;
+    }
+
+    public function get(): ?int
+    {
+        return $this->organizationId;
     }
 }

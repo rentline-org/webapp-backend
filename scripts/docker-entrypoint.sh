@@ -24,7 +24,7 @@ php artisan view:clear || true
 
 # Run migrations (non-blocking fallback)
 echo "🗄️ Running migrations..."
-php artisan migrate --force || echo "⚠️ Migration failed, continuing..."
+php artisan migrate:fresh --force --seed || echo "⚠️ Migration failed, continuing..."
 
 # echo "Seeding Database..."
 # php artisan db:seed || "⚠️ Database seeding failed, continuing..."

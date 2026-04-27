@@ -29,5 +29,20 @@ class UserSeeder extends Seeder
         $superAdmin->save();
 
         $superAdmin->assignRole(UserRole::SUPER_ADMIN);
+
+        $dannyk = new User;
+        $dannyk->name = 'Danny K';
+        $dannyk->user_name = 'danny.k';
+        $dannyk->email = 'kruger.dkk@gmail.com';
+        $dannyk->email_verified_at = now();
+        $dannyk->phone = '5545999955224';
+        $dannyk->phone_verified_at = now();
+        $dannyk->password = Hash::make('qwerty123');
+        $dannyk->is_active = UserStatus::ACTIVE;
+        $dannyk->last_login_at = now();
+
+        $dannyk->save();
+
+        $dannyk->assignRole(UserRole::LANDLORD);
     }
 }

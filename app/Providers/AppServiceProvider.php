@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Helpers\OrganizationHelper;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -28,5 +29,9 @@ class AppServiceProvider extends ServiceProvider
         // Gate::define('viewPulse', function (User $user) {
         //     return $user->isAdmin();
         // });
+
+        $this->app->singleton(OrganizationHelper::class, function () {
+            return new OrganizationHelper;
+        });
     }
 }
