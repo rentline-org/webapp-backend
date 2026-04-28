@@ -67,7 +67,7 @@ class PropertyService
         }
 
         $data = $dto->toArray();
-        $data['organization_id'] = $organizationId;
+        // $data['organization_id'] = $organizationId;
 
         // Never trust organization_id from the request payload.
         unset($data['organization_id']);

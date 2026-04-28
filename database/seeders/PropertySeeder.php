@@ -20,6 +20,12 @@ class PropertySeeder extends Seeder
                 ->apartment()
                 ->has(Unit::factory()->count(5), 'units')
                 ->create();
+
+            Property::factory()
+                ->count(2)
+                ->for($org)
+                ->house()
+                ->create();
         }
     }
 }
