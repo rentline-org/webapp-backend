@@ -5,4 +5,5 @@ use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'v1', 'middleware' => ['auth:sanctum']], function () {
     Route::apiResource('properties', PropertyController::class);
+    Route::get('properties/slug/{slug}', [PropertyController::class, 'showBySlug'])->name('properties.showBySlug');
 });

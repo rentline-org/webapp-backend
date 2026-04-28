@@ -6,6 +6,7 @@ use App\Models\Property;
 use App\Repositories\Contracts\PropertyRepositoryInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -79,9 +80,13 @@ class PropertyRepository implements PropertyRepositoryInterface
     {
         $property = Property::where('slug', $slug)->first();
 
-        if ($property) {
-            $property->load(['units', 'organization']);
+        if (! $property) {
+            throw new ModelNotFoundException("Property with slug '{$slug}' not found.");
         }
+
+        // if ($property) {
+        $property->load(['units', 'organization']);
+        // }
 
         return $property;
     }

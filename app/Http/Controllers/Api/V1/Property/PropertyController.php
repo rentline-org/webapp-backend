@@ -69,6 +69,16 @@ class PropertyController extends Controller
         return PropertyResource::make($property);
     }
 
+    public function showBySlug(string $slug)
+    {
+        $property = $this->propertyService->findBySlug($slug);
+        Gate::authorize('view', $property);
+
+        $property->load('units', 'organization');
+
+        return PropertyResource::make($property);
+    }
+
     /** Update the specified resource in storage. */
     public function update(PropertyInsertUpdateRequest $request, Property $property)
     {
