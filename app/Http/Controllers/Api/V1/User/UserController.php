@@ -83,7 +83,6 @@ class UserController extends Controller
     {
         Gate::authorize('create', User::class);
 
-        // Filter out SUPER_ADMIN role to prevent unauthorized elevation
         $roles = collect($request->validated()['roles'] ?? [])
             ->map(fn ($roleId) => (int) $roleId)
             ->reject(fn ($id) => $id === UserRole::SUPER_ADMIN->id())

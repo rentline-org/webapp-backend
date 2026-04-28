@@ -85,7 +85,7 @@ class PropertyRepository implements PropertyRepositoryInterface
         }
 
         // if ($property) {
-        $property->load(['units', 'organization']);
+        $property->load(['units', 'organization'])->withCount('units')->get();
         // }
 
         return $property;
