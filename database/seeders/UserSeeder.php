@@ -28,27 +28,6 @@ class UserSeeder extends Seeder
         $superAdmin->assignRole(UserRole::SUPER_ADMIN);
 
         // Danny (landlord)
-        $danny = User::create([
-            'first_name' => 'Danny',
-            'last_name' => 'K',
-            'name' => 'Danny K',
-            'user_name' => 'danny.k',
-            'email' => 'kruger.dkk@gmail.com',
-            'email_verified_at' => now(),
-            'phone' => '5545999955224',
-            'phone_verified_at' => now(),
-            'password' => Hash::make('qwerty123'),
-            'is_active' => UserStatus::ACTIVE,
-            'last_login_at' => now(),
-        ]);
-
-        $danny->assignRole(UserRole::LANDLORD);
-
-        // Extra users
-        $verifiedUser = User::factory()->create();
-        $verifiedUser->assignRole(UserRole::LANDLORD);
-
-        echo "\n\nCreated verified user:{$verifiedUser->email}\n\n";
 
         $unverifiedUser = User::create([
             'first_name' => 'Kai',
