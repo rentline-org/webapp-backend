@@ -11,12 +11,7 @@ class GenerateCrudStarter extends Command
     protected $signature = 'make:crud {name}';
     protected $description = 'Create a new CRUD starter setup for a given entity';
 
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
-    public function handle()
+    public function handle(): int
     {
         $name = $this->argument('name');
         $snakeName = Str::snake($name);
@@ -34,7 +29,11 @@ class GenerateCrudStarter extends Command
                     '--model' => $name,
                 ],
             ],
-            'request' => ['make:request', ['name' => "{$name}/{$name}InsertUpdateRequest"]],
+
+            // Separate requests
+            'insert_request' => ['make:request', ['name' => "{$name}/{$name}InsertRequest"]],
+            'update_request' => ['make:request', ['name' => "{$name}/{$name}UpdateRequest"]],
+
             'resource' => ['make:resource', ['name' => "{$name}/{$name}Resource"]],
             'policy' => ['make:policy', ['name' => "{$name}Policy", '--model' => $name]],
             'repository' => ['make:repo', ['repository' => "{$name}/{$name}Repository"]],
@@ -45,34 +44,30 @@ class GenerateCrudStarter extends Command
             'unit_test' => ['make:test', ['name' => "{$name}UnitTest", '--unit' => true]],
         ];
 
-        foreach ($tasks as $taskName => $task) {
-            [$command, $arguments] = $task;
-            if ($taskName === 'controller') {
-                if (isset($arguments['--api'])) {
-                    $this->callArtisanCommand('API Controller', 'make:controller', $arguments);
-                } else {
-                    unset($arguments['--api']); // Remove --api option
-                    $this->callArtisanCommand('Controller', 'make:controller', $arguments);
-                }
-            } else {
-                $this->callArtisanCommand($taskName, $command, $arguments);
-            }
+        foreach ($tasks as $taskName => [$command, $arguments]) {
+            $this->callArtisanCommand($taskName, $command, $arguments);
         }
 
         $this->info('CRUD starter created successfully!');
+
+        return self::SUCCESS;
     }
 
-    private function callArtisanCommand($taskName, $command, $arguments)
+    private function callArtisanCommand(string $taskName, string $command, array $arguments): void
     {
         try {
             $exitCode = Artisan::call($command, $arguments);
-            $this->line(Artisan::output());
+            $output = trim(Artisan::output());
 
-            return $exitCode !== 0;
-        } catch (\Exception $e) {
+            if ($output !== '') {
+                $this->line($output);
+            }
+
+            if ($exitCode !== 0) {
+                $this->error("{$taskName} failed with exit code {$exitCode}");
+            }
+        } catch (\Throwable $e) {
             $this->error("Error creating {$taskName}: {$e->getMessage()}");
-
-            return true;
         }
     }
 }

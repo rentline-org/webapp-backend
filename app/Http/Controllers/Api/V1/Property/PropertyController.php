@@ -4,7 +4,8 @@ namespace App\Http\Controllers\Api\V1\Property;
 
 use App\DTOs\Property\PropertyDTO;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Property\PropertyInsertUpdateRequest;
+use App\Http\Requests\Property\PropertyInsertRequest;
+use App\Http\Requests\Property\PropertyUpdateRequest;
 use App\Http\Resources\Property\PropertyResource;
 use App\Models\Property;
 use App\Services\Property\PropertyService;
@@ -46,7 +47,7 @@ class PropertyController extends Controller
     }
 
     /** Store a newly created resource in storage. */
-    public function store(PropertyInsertUpdateRequest $request)
+    public function store(PropertyInsertRequest $request)
     {
         Gate::authorize('create', Property::class);
 
@@ -63,7 +64,6 @@ class PropertyController extends Controller
     public function show(Property $property)
     {
         Gate::authorize('view', $property);
-
         $property->load('units', 'organization');
 
         return PropertyResource::make($property);
@@ -80,7 +80,7 @@ class PropertyController extends Controller
     }
 
     /** Update the specified resource in storage. */
-    public function update(PropertyInsertUpdateRequest $request, Property $property)
+    public function update(PropertyUpdateRequest $request, Property $property)
     {
         Gate::authorize('update', $property);
 
