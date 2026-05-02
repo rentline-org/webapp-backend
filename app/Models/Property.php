@@ -7,6 +7,7 @@ use App\Helpers\OrganizationHelper;
 use App\Models\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Str;
 
 class Property extends Model
 {
@@ -83,6 +84,26 @@ class Property extends Model
         static::creating(function ($model) {
             if (! $model->organization_id) {
                 $model->organization_id = app(OrganizationHelper::class)->get();
+            }
+        });
+
+        static::saving(function ($property) {
+            if ($property->isDirty('title')) {
+                $baseSlug = Str::slug($property->title);
+                $slug = $baseSlug;
+                $count = 1;
+
+                while (
+                    static::query()->where('slug', $slug)
+                        ->where('id', '!=', $property->id)
+                        ->exists()
+                ) {
+
+                    $slug = "{$baseSlug}-{$count}";
+                    $count++;
+                }
+
+                $property->slug = $slug;
             }
         });
     }

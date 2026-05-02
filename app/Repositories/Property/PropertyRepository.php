@@ -50,9 +50,7 @@ class PropertyRepository implements PropertyRepositoryInterface
      */
     public function delete(Property $property): bool
     {
-        return DB::transaction(function () use ($property) {
-            return (bool) $property->delete();
-        });
+        return DB::transaction(fn () => tap($property)->delete());
     }
 
     /**
@@ -62,11 +60,7 @@ class PropertyRepository implements PropertyRepositoryInterface
      */
     public function findById(int $id): ?Property
     {
-        $property = Property::find($id);
-
-        if ($property) {
-            $property->load(['units', 'organization']);
-        }
+        $property = Property::with(['units', 'organizations'])->find($id);
 
         return $property;
     }
@@ -78,14 +72,14 @@ class PropertyRepository implements PropertyRepositoryInterface
      */
     public function findBySlug(string $slug): ?Property
     {
-        $property = Property::where('slug', $slug)->first();
+        $property = Property::query()->where('slug', $slug)->first();
 
         if (! $property) {
             throw new ModelNotFoundException("Property with slug '{$slug}' not found.");
         }
 
         // if ($property) {
-        $property->load(['units', 'organization'])->withCount('units')->get();
+        $property->load(['units', 'organization'])->loadCount('units');
         // }
 
         return $property;
@@ -112,10 +106,6 @@ class PropertyRepository implements PropertyRepositoryInterface
     public function update(Property $property, array $data): Property
     {
         return DB::transaction(function () use ($property, $data) {
-            if (empty($data['slug']) && ! empty($data['title']) && empty($property->slug)) {
-                $data['slug'] = Str::slug($data['title']);
-            }
-
             $property->update($data);
 
             return $property->refresh();
