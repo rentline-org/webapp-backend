@@ -50,7 +50,9 @@ class PropertyRepository implements PropertyRepositoryInterface
      */
     public function delete(Property $property): bool
     {
-        return DB::transaction(fn () => tap($property)->delete());
+        return DB::transaction(function () use ($property) {
+            return $property->query()->delete();
+        });
     }
 
     /**
