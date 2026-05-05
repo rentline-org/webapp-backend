@@ -4,7 +4,6 @@ namespace App\Http\Requests\Unit;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use PropertyUnitTypeMap;
 
 class UnitInsertRequest extends FormRequest
 {
@@ -23,10 +22,9 @@ class UnitInsertRequest extends FormRequest
             'unit_type' => [
                 'required',
                 Rule::in(
-                    array_map(
-                        fn ($type) => $type->value,
-                        PropertyUnitTypeMap::allowed($this->route('property')->property_type)
-                    )
+                    $this->route('property')
+                        ->property_type
+                        ->allowedUnitTypeValues()
                 ),
             ],
 
