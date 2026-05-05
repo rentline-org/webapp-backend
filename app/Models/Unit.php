@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\UnitType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Unit extends Model
 {
@@ -17,42 +18,54 @@ class Unit extends Model
         'unit_type',
         'is_available',
         'is_furnished',
+        'is_pet_friendly',
+
         'rent_price',
         'sale_price',
+        'buy_price',
+
         'bedrooms',
         'bathrooms',
         'square_feet',
+
         'amenities',
+        'sale_types',
+
         'available_from',
-        'is_pet_friendly',
     ];
 
     protected $casts = [
         'unit_type' => UnitType::class,
+
         'is_available' => 'boolean',
         'is_furnished' => 'boolean',
         'is_pet_friendly' => 'boolean',
+
         'rent_price' => 'decimal:2',
         'sale_price' => 'decimal:2',
+        'buy_price' => 'decimal:2',
+
         'square_feet' => 'decimal:2',
+
         'amenities' => 'array',
+        'sale_types' => 'array',
+
         'available_from' => 'date',
     ];
 
-    public function property()
+    public function property(): BelongsTo
     {
         return $this->belongsTo(Property::class);
     }
 
     protected static function booted(): void
     {
-        static::creating(function ($unit) {
-            if (! $unit->property) {
-                return;
-            }
 
-            if (in_array($unit->property->property_type->value, ['house', 'land'])) {
-                throw new \Exception('This property type cannot have units.');
+        static::deleting(function (Unit $unit) {
+            $property = $unit->property;
+
+            if ($property && $property->units()->count() <= 1) {
+                throw new \Exception('A property must have at least one unit.');
             }
         });
     }

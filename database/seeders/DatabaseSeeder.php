@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
         $this->call(RoleSeeder::class);
         $this->call(UserSeeder::class);
         $this->call(OrganizationSeeder::class);
-        $this->call(PropertySeeder::class);
+        // $this->call(PropertySeeder::class);
 
         // if (app()->environment('local', 'development')) {
         //     Organization::factory()->count(2)->create();

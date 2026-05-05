@@ -13,12 +13,6 @@ use Illuminate\Support\Str;
 
 class PropertyRepository implements PropertyRepositoryInterface
 {
-    /**
-     * Return all properties matching the given filters.
-     *
-     * This is useful for exports, dropdowns, and admin screens where
-     * pagination is not required.
-     */
     public function all(array $filters = []): Collection
     {
         return $this->query($filters)
@@ -26,12 +20,6 @@ class PropertyRepository implements PropertyRepositoryInterface
             ->get();
     }
 
-    /**
-     * Create a new property record.
-     *
-     * If the slug is not provided, it is generated from the title.
-     * The record is created inside a transaction for safety.
-     */
     public function create(array $data): Property
     {
         return DB::transaction(function () use ($data) {
@@ -39,39 +27,23 @@ class PropertyRepository implements PropertyRepositoryInterface
                 $data['slug'] = Str::slug($data['title']);
             }
 
-            return Property::create($data);
+            return Property::create($data)->loadCount('units');
         });
     }
 
-    /**
-     * Delete a property record.
-     *
-     * Related units should cascade through the foreign key constraint.
-     */
     public function delete(Property $property): bool
     {
-        return DB::transaction(function () use ($property) {
-            return $property->query()->delete();
-        });
+        /** @var Property $property */
+        return DB::transaction($property->delete(...));
     }
 
-    /**
-     * Find a property by its primary key.
-     *
-     * Returns null if no property is found.
-     */
     public function findById(int $id): ?Property
     {
-        $property = Property::with(['units', 'organizations'])->find($id);
-
-        return $property;
+        return Property::with(['units', 'organization'])
+            ->withCount('units')
+            ->find($id);
     }
 
-    /**
-     * Find a property by its slug.
-     *
-     * This is useful for routes that use human-readable URLs.
-     */
     public function findBySlug(string $slug): ?Property
     {
         $property = Property::query()->where('slug', $slug)->first();
@@ -80,46 +52,29 @@ class PropertyRepository implements PropertyRepositoryInterface
             throw new ModelNotFoundException("Property with slug '{$slug}' not found.");
         }
 
-        // if ($property) {
-        $property->load(['units', 'organization'])->loadCount('units');
-        // }
-
-        return $property;
+        return $property
+            ->load(['units', 'organization'])
+            ->loadCount('units');
     }
 
-    /**
-     * Return a paginated list of properties matching the given filters.
-     *
-     * The filters behave the same way as in `all()`.
-     */
     public function paginate(
         array $filters = [],
         int $perPage = 15
     ): LengthAwarePaginator {
-        return $this->query($filters)->paginate($perPage);
+        return $this->query($filters)
+            ->withCount('units')
+            ->paginate($perPage);
     }
 
-    /**
-     * Update an existing property record.
-     *
-     * If the slug is missing and the property does not already have one,
-     * a slug is generated from the title.
-     */
     public function update(Property $property, array $data): Property
     {
         return DB::transaction(function () use ($property, $data) {
             $property->update($data);
 
-            return $property->refresh();
+            return $property->refresh()->loadCount('units');
         });
     }
 
-    /**
-     * Build the base query used by read operations.
-     *
-     * Keeping this in one place makes `all()` and `paginate()` behave the same
-     * and keeps filtering logic easy to maintain.
-     */
     protected function query(array $filters = []): Builder
     {
         $query = Property::query();
@@ -161,22 +116,15 @@ class PropertyRepository implements PropertyRepositoryInterface
             });
         }
 
+        // 🔥 fully unit-driven pricing
         if (isset($filters['min_rent_price'])) {
-            $query->where(function (Builder $q) use ($filters) {
-                $q->where('rent_price', '>=', $filters['min_rent_price'])
-                    ->orWhereHas('units', function (Builder $unitQuery) use ($filters) {
-                        $unitQuery->where('rent_price', '>=', $filters['min_rent_price']);
-                    });
-            });
+            $query->whereHas('units', fn (Builder $q) => $q->where('rent_price', '>=', $filters['min_rent_price'])
+            );
         }
 
         if (isset($filters['max_rent_price'])) {
-            $query->where(function (Builder $q) use ($filters) {
-                $q->where('rent_price', '<=', $filters['max_rent_price'])
-                    ->orWhereHas('units', function (Builder $unitQuery) use ($filters) {
-                        $unitQuery->where('rent_price', '<=', $filters['max_rent_price']);
-                    });
-            });
+            $query->whereHas('units', fn (Builder $q) => $q->where('rent_price', '<=', $filters['max_rent_price'])
+            );
         }
 
         return $query->latest();

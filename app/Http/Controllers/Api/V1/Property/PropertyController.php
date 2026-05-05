@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Property;
 
 use App\DTOs\Property\PropertyDTO;
+use App\DTOs\Unit\UnitDTO;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Property\PropertyInsertRequest;
 use App\Http\Requests\Property\PropertyUpdateRequest;
@@ -11,17 +12,13 @@ use App\Models\Property;
 use App\Services\Property\PropertyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Symfony\Component\HttpFoundation\Response;
 
 class PropertyController extends Controller
 {
     public function __construct(
         protected PropertyService $propertyService
-    ) {
-        //
-    }
+    ) {}
 
-    /** Display a listing of the resource. */
     public function index(Request $request)
     {
         Gate::authorize('viewAny', Property::class);
@@ -33,72 +30,84 @@ class PropertyController extends Controller
             'city',
             'state',
             'country',
-            'min_rent_price',
-            'max_rent_price',
             'with_units',
         ]);
 
-        $properties = $this->propertyService->all(
-            filters: $filters,
-        );
+        // 🚨 price filtering is now UNIT responsibility
+        if ($request->filled('min_rent_price')) {
+            $filters['min_rent_price'] = $request->input('min_rent_price');
+        }
+
+        if ($request->filled('max_rent_price')) {
+            $filters['max_rent_price'] = $request->input('max_rent_price');
+        }
+
+        $properties = $this->propertyService->all($filters);
 
         return PropertyResource::collection($properties);
-
     }
 
-    /** Store a newly created resource in storage. */
     public function store(PropertyInsertRequest $request)
     {
         Gate::authorize('create', Property::class);
 
-        $request->validated();
-        $dto = PropertyDTO::fromRequest($request);
+        $validated = $request->validated();
 
-        $property = $this->propertyService->create($dto);
+        $units = $validated['units'] ?? [];
+        unset($validated['units']);
 
-        return PropertyResource::make($property);
+        $property = $this->propertyService->create(
+            PropertyDTO::fromArray($validated),
+            collect($units)
+                ->map(UnitDTO::fromArray(...))
+                ->all()
+        );
 
+        return PropertyResource::make(
+            $property->loadCount('units')
+        );
     }
 
-    /** Display the specified resource. */
     public function show(Property $property)
     {
         Gate::authorize('view', $property);
-        $property->load('units', 'organization');
 
-        return PropertyResource::make($property);
+        return PropertyResource::make(
+            $property->load(['units', 'organization'])->loadCount('units')
+        );
     }
 
     public function showBySlug(string $slug)
     {
         $property = $this->propertyService->findBySlug($slug);
+
         Gate::authorize('view', $property);
 
-        $property->load('units', 'organization');
-
-        return PropertyResource::make($property);
+        return PropertyResource::make(
+            $property->load(['units', 'organization'])->loadCount('units')
+        );
     }
 
-    /** Update the specified resource in storage. */
     public function update(PropertyUpdateRequest $request, Property $property)
     {
         Gate::authorize('update', $property);
 
-        $request->validated();
-        $dto = PropertyDTO::fromRequest($request, $property);
+        $updatedProperty = $this->propertyService->update(
+            $property,
+            PropertyDTO::fromRequest($request, $property)
+        );
 
-        $updatedProperty = $this->propertyService->update($property, $dto);
-
-        return PropertyResource::make($updatedProperty);
+        return PropertyResource::make(
+            $updatedProperty->loadCount('units')
+        );
     }
 
-    /** Remove the specified resource from storage. */
     public function destroy(Property $property)
     {
         Gate::authorize('delete', $property);
 
         $this->propertyService->delete($property);
 
-        return $this->respond(['message' => 'Property deleted successfully.'], Response::HTTP_NO_CONTENT);
+        return response()->noContent();
     }
 }

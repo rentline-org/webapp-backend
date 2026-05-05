@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Enums\PropertyType;
+use App\Enums\UnitType;
 use App\Helpers\OrganizationHelper;
 use App\Models\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Str;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Property extends Model
 {
@@ -24,35 +26,13 @@ class Property extends Model
         'postal_code',
         'country',
         'property_type',
-        'is_available',
-        'is_furnished',
-        'rent_price',
-        'sale_price',
-        'buy_price',
-        'bedrooms',
-        'bathrooms',
-        'square_feet',
-        'amenities',
-        'available_from',
-        'is_pet_friendly',
-        'sale_types',
     ];
 
     protected $casts = [
         'property_type' => PropertyType::class,
-        'is_available' => 'boolean',
-        'is_furnished' => 'boolean',
-        'is_pet_friendly' => 'boolean',
-        'rent_price' => 'decimal:2',
-        'sale_price' => 'decimal:2',
-        'buy_price' => 'decimal:2',
-        'square_feet' => 'decimal:2',
-        'amenities' => 'array',
-        'sale_types' => 'array',
-        'available_from' => 'date',
     ];
 
-    public function units()
+    public function units(): HasMany
     {
         return $this->hasMany(Unit::class);
     }
@@ -67,14 +47,26 @@ class Property extends Model
         return $this->hasMany(Contact::class);
     }
 
+    /** Always at least 1 unit */
     public function hasUnits(): bool
     {
         return $this->units()->exists();
     }
 
+    /** For UI convenience */
+    public function primaryUnit(): ?Unit
+    {
+        return $this->units()->first();
+    }
+
     public function isSingleUnit(): bool
     {
-        return ! $this->hasUnits();
+        return $this->property_type == PropertyType::SINGLE_UNIT;
+    }
+
+    public function isMultiUnit(): bool
+    {
+        return $this->property_type == PropertyType::MULTI_UNIT;
     }
 
     protected static function booted(): void
@@ -94,16 +86,36 @@ class Property extends Model
                 $count = 1;
 
                 while (
-                    static::query()->where('slug', $slug)
+                    static::query()
+                        ->where('slug', $slug)
                         ->where('id', '!=', $property->id)
                         ->exists()
                 ) {
-
                     $slug = "{$baseSlug}-{$count}";
                     $count++;
                 }
 
                 $property->slug = $slug;
+            }
+        });
+
+        static::created(function (Property $property) {
+            if ($property->units()->exists()) {
+                return;
+            }
+
+            // if ($property->property_type === PropertyType::SINGLE_UNIT) {
+            //     $property->units()->create([
+            //         'name' => $property->title,
+            //         'unit_type' => UnitType::HOUSE,
+            //     ]);
+            // }
+
+            if ($property->property_type === PropertyType::LAND) {
+                $property->units()->create([
+                    'name' => $property->title,
+                    'unit_type' => UnitType::LAND,
+                ]);
             }
         });
     }

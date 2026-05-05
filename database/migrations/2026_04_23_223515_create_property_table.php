@@ -17,35 +17,20 @@ return new class extends Migration
             $table->unique(['organization_id', 'slug']);
 
             $table->string('title');
-            $table->string('description')->nullable();
+            $table->text('description')->nullable();
 
+            // Location
             $table->string('address');
             $table->string('city');
             $table->string('state');
             $table->string('postal_code');
             $table->string('country')->nullable();
 
+            // Structure only (not business logic)
             $table->enum(
                 'property_type',
                 array_map(fn ($case) => $case->value, PropertyType::cases())
-            )->default(PropertyType::HOUSE->value);
-
-            $table->boolean('is_available')->default(true);
-            $table->boolean('is_furnished')->default(false);
-            $table->decimal('rent_price', 10, 2)->nullable();
-            $table->decimal('sale_price', 10, 2)->nullable();
-
-            $table->decimal('buy_price', 10, 2)->nullable();
-
-            $table->integer('bedrooms')->nullable();
-            $table->integer('bathrooms')->nullable();
-            $table->decimal('square_feet', 10, 2)->nullable();
-
-            $table->json('amenities')->nullable();
-            $table->date('available_from')->nullable();
-            $table->boolean('is_pet_friendly')->default(false);
-
-            $table->json('sale_types')->nullable();
+            )->default(PropertyType::SINGLE_UNIT->value);
 
             $table->timestamps();
 

@@ -31,7 +31,7 @@ class GenerateCrudStarter extends Command
             ],
 
             // Separate requests
-            'insert_request' => ['make:request', ['name' => "{$name}/{$name}InsertRequest"]],
+            'insert_request' => ['make:request', ['name' => "{$name}/{$name}CreateRequest"]],
             'update_request' => ['make:request', ['name' => "{$name}/{$name}UpdateRequest"]],
 
             'resource' => ['make:resource', ['name' => "{$name}/{$name}Resource"]],

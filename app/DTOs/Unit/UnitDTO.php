@@ -33,27 +33,92 @@ class UnitDTO
             name: $request->input('name', $existing?->name),
             description: $request->input('description', $existing?->description),
 
-            unit_type: UnitType::from(
+            unit_type: UnitType::tryFrom(
                 $request->input('unit_type', $existing?->unit_type?->value)
+            ) ?? UnitType::APARTMENT, // safe fallback
+
+            is_available: $request->boolean(
+                'is_available',
+                $existing?->is_available ?? true
             ),
 
-            is_available: $request->boolean('is_available', $existing?->is_available ?? true),
-            is_furnished: $request->boolean('is_furnished', $existing?->is_furnished ?? false),
+            is_furnished: $request->boolean(
+                'is_furnished',
+                $existing?->is_furnished ?? false
+            ),
 
-            rent_price: $request->input('rent_price', $existing?->rent_price),
-            sale_price: $request->input('sale_price', $existing?->sale_price),
+            rent_price: self::nullableFloat(
+                $request->input('rent_price', $existing?->rent_price)
+            ),
 
-            bedrooms: $request->input('bedrooms', $existing?->bedrooms),
-            bathrooms: $request->input('bathrooms', $existing?->bathrooms),
-            square_feet: $request->input('square_feet', $existing?->square_feet),
+            sale_price: self::nullableFloat(
+                $request->input('sale_price', $existing?->sale_price)
+            ),
+
+            bedrooms: self::nullableInt(
+                $request->input('bedrooms', $existing?->bedrooms)
+            ),
+
+            bathrooms: self::nullableInt(
+                $request->input('bathrooms', $existing?->bathrooms)
+            ),
+
+            square_feet: self::nullableFloat(
+                $request->input('square_feet', $existing?->square_feet)
+            ),
 
             amenities: $request->input('amenities', $existing?->amenities),
-            available_from: $request->input('available_from', $existing?->available_from),
+
+            available_from: $request->input(
+                'available_from',
+                $existing?->available_from
+            ),
 
             is_pet_friendly: $request->boolean(
                 'is_pet_friendly',
                 $existing?->is_pet_friendly ?? false
             ),
+        );
+    }
+
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            property_id: $data['property_id'] ?? null,
+
+            name: $data['name'],
+            description: $data['description'] ?? null,
+
+            unit_type: UnitType::from($data['unit_type']),
+
+            is_available: $data['is_available'] ?? true,
+            is_furnished: $data['is_furnished'] ?? false,
+            is_pet_friendly: $data['is_pet_friendly'] ?? false,
+
+            rent_price: isset($data['rent_price'])
+                ? self::nullableFloat($data['rent_price'])
+                : null,
+
+            sale_price: isset($data['sale_price'])
+                ? self::nullableFloat($data['sale_price'])
+                : null,
+
+            bedrooms: isset($data['bedrooms'])
+                ? self::nullableInt($data['bedrooms'])
+                : null,
+
+            bathrooms: isset($data['bathrooms'])
+                ? self::nullableInt($data['bathrooms'])
+                : null,
+
+            square_feet: isset($data['square_feet'])
+                ? self::nullableFloat($data['square_feet'])
+                : null,
+
+            amenities: $data['amenities'] ?? null,
+
+            available_from: $data['available_from'] ?? null,
+
         );
     }
 
@@ -76,5 +141,24 @@ class UnitDTO
             'available_from' => $this->available_from,
             'is_pet_friendly' => $this->is_pet_friendly,
         ];
+    }
+
+    private static function nullableFloat($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (float) $value;
+    }
+
+    /** Normalize nullable int inputs */
+    private static function nullableInt($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) $value;
     }
 }

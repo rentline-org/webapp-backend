@@ -3,9 +3,11 @@
 namespace App\Services\Property;
 
 use App\DTOs\Property\PropertyDTO;
+use App\DTOs\Unit\UnitDTO;
 use App\Helpers\OrganizationHelper;
 use App\Models\Property;
 use App\Repositories\Contracts\PropertyRepositoryInterface;
+use App\Repositories\Contracts\UnitRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use RuntimeException;
@@ -13,7 +15,8 @@ use RuntimeException;
 class PropertyService
 {
     public function __construct(
-        protected PropertyRepositoryInterface $propertyRepository
+        protected PropertyRepositoryInterface $propertyRepository,
+        protected UnitRepositoryInterface $unitRepository
     ) {
         //
     }
@@ -58,7 +61,7 @@ class PropertyService
      *
      * Landlord authorization should be enforced by policy.
      */
-    public function create(PropertyDTO $dto): Property
+    public function create(PropertyDTO $dto, array $units): Property
     {
         $organizationId = app(OrganizationHelper::class)->get();
 
@@ -67,14 +70,22 @@ class PropertyService
         }
 
         $data = $dto->toArray();
-        // $data['organization_id'] = $organizationId;
-
-        // Never trust organization_id from the request payload.
         unset($data['organization_id']);
 
         $data['organization_id'] = $organizationId;
 
-        return $this->propertyRepository->create($data);
+        $createdProperty = $this->propertyRepository->create($data);
+
+        if (! empty($units)) {
+            /** @var UnitDTO $unitDTO */
+            foreach ($units as $unitDTO) {
+                $this->unitRepository->create($createdProperty, $unitDTO->toArray());
+            }
+        }
+
+        $createdProperty->load(['units']);
+
+        return $createdProperty;
     }
 
     /**
