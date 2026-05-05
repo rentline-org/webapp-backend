@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://localhost:5173', 'https://rentline-frontend.onrender.com'],
+    'allowed_origins' => ['http://localhost:5173', 'https://rentline-frontend.onrender.com', 'https://app.rentline.io'],
 
     'allowed_origins_patterns' => [],
 
