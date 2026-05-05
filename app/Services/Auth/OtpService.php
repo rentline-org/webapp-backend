@@ -91,7 +91,7 @@ class OtpService
         $body = "{$otp} is your OTP";
 
         Resend::emails()->send([
-            'from' => 'Danny <onboarding@contact.kardan.dev>',
+            'from' => 'Rentline System <onboarding@system.rentline.io>',
             'to' => $user->email,
             'subject' => 'Your OTP Code',
             'html' => "<p>{$body}</p>",
