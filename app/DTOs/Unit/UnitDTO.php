@@ -11,6 +11,7 @@ class UnitDTO
     public function __construct(
         public ?int $property_id,
         public string $name,
+        public ?string $slug,
         public ?string $description,
         public UnitType $unit_type,
         public bool $is_available,
@@ -29,6 +30,7 @@ class UnitDTO
     {
         return new self(
             property_id: $existing?->property_id ?? $request->input('property_id'),
+            slug: $existing?->slug ?? $request->input('slug'),
 
             name: $request->input('name', $existing?->name),
             description: $request->input('description', $existing?->description),
@@ -81,11 +83,11 @@ class UnitDTO
         );
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data, ?Unit $existing = null): self
     {
         return new self(
             property_id: $data['property_id'] ?? null,
-
+            slug: $existing?->slug ?? ($data['slug'] ?? null),
             name: $data['name'],
             description: $data['description'] ?? null,
 
@@ -129,6 +131,7 @@ class UnitDTO
             'property_id' => $this->property_id,
             'name' => $this->name,
             'description' => $this->description,
+            'slug' => $this->slug,
             'unit_type' => $this->unit_type->value,
             'is_available' => $this->is_available,
             'is_furnished' => $this->is_furnished,

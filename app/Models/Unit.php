@@ -2,14 +2,19 @@
 
 namespace App\Models;
 
+use App\Enums\PropertyType;
 use App\Enums\UnitType;
+use App\Traits\HasSlug;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Unit extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSlug;
+
+    protected $slugField = 'name';
+    protected $slugUniqueBy = 'property_id';
 
     protected $fillable = [
         'property_id',
@@ -64,7 +69,7 @@ class Unit extends Model
         static::deleting(function (Unit $unit) {
             $property = $unit->property;
 
-            if ($property && $property->units()->count() <= 1) {
+            if ($property && $property->property_type !== PropertyType::MULTI_UNIT && $property->units()->count() <= 1) {
                 throw new \Exception('A property must have at least one unit.');
             }
         });

@@ -6,6 +6,7 @@ use App\Enums\PropertyType;
 use App\Enums\UnitType;
 use App\Helpers\OrganizationHelper;
 use App\Models\Scopes\OrganizationScope;
+use App\Traits\HasSlug;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,7 +14,9 @@ use Illuminate\Support\Str;
 
 class Property extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSlug;
+
+    protected $slugField = 'title';
 
     protected $fillable = [
         'organization_id',
@@ -79,25 +82,25 @@ class Property extends Model
             }
         });
 
-        static::saving(function ($property) {
-            if ($property->isDirty('title')) {
-                $baseSlug = Str::slug($property->title);
-                $slug = $baseSlug;
-                $count = 1;
+        // static::saving(function ($property) {
+        //     if ($property->isDirty('title')) {
+        //         $baseSlug = Str::slug($property->title);
+        //         $slug = $baseSlug;
+        //         $count = 1;
 
-                while (
-                    static::query()
-                        ->where('slug', $slug)
-                        ->where('id', '!=', $property->id)
-                        ->exists()
-                ) {
-                    $slug = "{$baseSlug}-{$count}";
-                    $count++;
-                }
+        //         while (
+        //             static::query()
+        //                 ->where('slug', $slug)
+        //                 ->where('id', '!=', $property->id)
+        //                 ->exists()
+        //         ) {
+        //             $slug = "{$baseSlug}-{$count}";
+        //             $count++;
+        //         }
 
-                $property->slug = $slug;
-            }
-        });
+        //         $property->slug = $slug;
+        //     }
+        // });
 
         static::created(function (Property $property) {
             if ($property->units()->exists()) {

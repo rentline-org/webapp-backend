@@ -19,6 +19,7 @@ class UnitResource extends JsonResource
             'id' => $this->id,
             'property_id' => $this->property_id,
             'name' => $this->name,
+            'slug' => $this->slug,
             'description' => $this->description,
             'unit_type' => $this->unit_type,
             'is_available' => $this->is_available,
