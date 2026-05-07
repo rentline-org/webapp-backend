@@ -59,7 +59,7 @@ class PropertyController extends Controller
         $property = $this->propertyService->create(
             PropertyDTO::fromArray($validated),
             collect($units)
-                ->map(UnitDTO::fromArray(...))
+                ->map(fn ($unit) => UnitDTO::fromArray($unit, null))
                 ->all()
         );
 
