@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Laravel Web Application (Production)
 # Stage 1: Build stage
-FROM php:8.2-fpm-alpine AS builder
+FROM php:8.4-fpm-alpine AS builder
 
 RUN apk add --no-cache \
     build-base \
