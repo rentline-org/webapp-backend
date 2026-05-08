@@ -112,7 +112,6 @@ class UserController extends Controller
         Gate::authorize('view', $user);
 
         return UserResource::make($user);
-
     }
 
     /**
@@ -175,7 +174,8 @@ class UserController extends Controller
      */
     public function assignRole(AdminAssignUserRoleRequest $request)
     {
-        $user = User::find((int) $request->id);
+
+        $user = User::query()->find((int) $request->id);
         Gate::authorize('assignRole', $user);
         $roles = collect($request->validated()['roles'] ?? [])
             ->map(fn ($roleId) => (int) $roleId)
@@ -242,9 +242,10 @@ class UserController extends Controller
      */
     public function updateProfile(UserProfileUpdateRequest $request)
     {
-        $user = User::findOrFail($request->user()->id);
+        $user = $request->user();
         Gate::authorize('update', $user);
         $data = UserDTO::fromRequest($request, $user);
+
         $updatedUser = $this->userService->updateUserData($data, $user, true);
 
         return UserResource::make($updatedUser);
@@ -284,7 +285,7 @@ class UserController extends Controller
      */
     public function updateProfileAvatar(UserProfileAvatarUpdateRequest $request)
     {
-        $user = User::findOrFail($request->user()->id);
+        $user = $request->user();
         Gate::authorize('update', $user);
         $updatedUser = $this->userService->updateUserAvatar($user, $request->avatar);
 

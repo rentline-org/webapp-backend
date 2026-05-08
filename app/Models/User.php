@@ -28,10 +28,11 @@ class User extends Authenticatable implements HasMedia
     protected $fillable = [
         'first_name',
         'last_name',
-        'user_name',
         'name',
         'email',
         'password',
+        'urls',
+        'dob',
         'phone',
         'is_active',
         'created_by',
@@ -55,7 +56,7 @@ class User extends Authenticatable implements HasMedia
     public function registerMediaCollections(): void
     {
         // profile photos
-        $this->addMediaCollection(MediaCollection::PROFILE->value)->singleFile();
+        $this->addMediaCollection(MediaCollection::PROFILE->value)->useDisk('s3')->singleFile();
     }
 
     public function isSuperAdmin(): bool
@@ -99,6 +100,8 @@ class User extends Authenticatable implements HasMedia
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'dob' => 'date',
+            'urls' => 'array',
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];

@@ -3,6 +3,7 @@
 namespace App\DTOs\User;
 
 use App\Models\User;
+use DateTimeInterface;
 use Illuminate\Http\Request;
 
 class UserDTO
@@ -11,12 +12,15 @@ class UserDTO
         public readonly ?int $id,
         public readonly ?string $firstName,
         public readonly ?string $lastName,
+
         public readonly ?string $name,
         public readonly ?string $email,
         public readonly ?string $password,
         public readonly ?string $phone,
         public readonly ?bool $isActive,
         public readonly ?array $roles,
+        public readonly ?array $urls,
+        public readonly ?DateTimeInterface $dob,
     ) {}
 
     public static function fromRequest(Request $request, ?User $existing = null, ?array $roles = null): self
@@ -27,12 +31,15 @@ class UserDTO
             $existing?->id,
             $request->input('first_name'),
             $request->input('last_name'),
+
             $request->input('name'),
             $request->input('email'),
             $request->input('password'),
             $request->input('phone'),
             $request->has('is_active') ? $request->boolean('is_active') : null,
             is_array($roles) ? $roles : null,
+            $request->input('urls'),
+            $request->date('dob'),
         );
     }
 
@@ -48,6 +55,8 @@ class UserDTO
             $data['phone'] ?? null,
             isset($data['is_active']) ? (bool) $data['is_active'] : null,
             isset($data['roles']) && is_array($data['roles']) ? $data['roles'] : null,
+            $data['urls'] ?? null,
+            $data['dob'] ?? null,
         );
     }
 
@@ -63,6 +72,9 @@ class UserDTO
             'phone' => $this->phone,
             'is_active' => $this->isActive,
             'roles' => $this->roles,
+            'urls' => $this->urls,
+            'dob' => $this->dob,
+            // 'dob' => $this->dob?->format('Y-m-d'),
         ], fn ($value) => ! is_null($value));
     }
 }

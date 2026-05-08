@@ -14,8 +14,9 @@ class UserSeeder extends Seeder
     {
         // Super Admin
         $superAdmin = User::create([
+            'first_name' => 'Super',
+            'last_name' => 'Admin',
             'name' => 'Super Admin',
-            'user_name' => 'super.admin',
             'email' => 'superadmin@ims.com',
             'email_verified_at' => now(),
             'phone' => '01700000000',
@@ -33,7 +34,6 @@ class UserSeeder extends Seeder
             'first_name' => 'Kai',
             'last_name' => 'Kruger',
             'name' => 'Kai Kruger',
-            'user_name' => 'kai.kruger',
             'email' => 'danniellkkruger@gmail.com',
             'email_verified_at' => null,
             'phone' => '5545999955334',

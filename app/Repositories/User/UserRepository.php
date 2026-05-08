@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -103,17 +104,18 @@ class UserRepository implements UserRepositoryInterface
 
     public function delete(User $user): bool
     {
+        /** @var Model $user */
         return $user->delete();
     }
 
     public function findByEmail(string $email): ?User
     {
-        return User::where('email', $email)->first();
+        return User::query()->where('email', $email)->first();
     }
 
     public function findById(int $id): ?User
     {
-        return User::find($id);
+        return User::query()->find($id);
     }
 
     public function findByIdWithRoles(int $id): ?User
