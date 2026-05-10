@@ -17,16 +17,40 @@ class ActiveOrganizationMiddleware
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        $token = $user?->currentAccessToken();
 
-        $activeOrgId = $token?->organization_id;
+        if (! $user) {
+            return $next($request);
+        }
 
-        // Always set it — even if null
-        app(OrganizationHelper::class)->set($activeOrgId);
+        /**
+         * Priority:
+         * 1. X-Organization-Id header
+         * 2. Sanctum token organization_id
+         */
+        $headerOrgId = $request->header('X-Organization-Id');
 
-        if ($user && $activeOrgId && ! $user->organizations()->whereKey($activeOrgId)->exists()) {
+        if (! $headerOrgId) {
+            abort(403, 'Select an active organization first');
+        }
+
+        $activeOrgId = $headerOrgId;
+
+        /**
+         * Validate organization access
+         */
+        if (
+            $activeOrgId &&
+            ! $user->organizations()->whereKey($activeOrgId)->exists()
+        ) {
             abort(403, 'Invalid organization for this user.');
         }
+
+        /**
+         * Store active organization in singleton helper
+         */
+        app(OrganizationHelper::class)->set(
+            $activeOrgId ? (int) $activeOrgId : null
+        );
 
         return $next($request);
     }

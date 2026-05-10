@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\V1\Organization;
 
 use App\DTOs\Organization\OrganizationDTO;
+use App\Helpers\OrganizationHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Organization\OrganizationInsertUpdateRequest;
+use App\Http\Requests\Organization\OrganizationLogoUpdateRequest;
 use App\Http\Resources\Organization\OrganizationResource;
 use App\Models\Organization;
 use App\Services\Auth\AuthService;
@@ -69,6 +71,30 @@ class OrganizationController extends Controller
         $updatedOrganization = $this->organizationService->updateOrganization($user, $organizationDTO);
 
         return new OrganizationResource($updatedOrganization);
+    }
+
+    public function updateLogo(OrganizationLogoUpdateRequest $request)
+    {
+        $request->validated();
+
+        $orgId = app(OrganizationHelper::class)->getActiveOrgId();
+
+        $organization = $this->organizationService->getOrganization($orgId);
+
+        Gate::authorize('update', $organization);
+        $updatedOrg = $this->organizationService->updateOrganizationLogo($organization, $request->logo);
+
+        return OrganizationResource::make($updatedOrg);
+    }
+
+    public function deleteLogo()
+    {
+        $orgId = app(OrganizationHelper::class)->getActiveOrgId();
+        $organization = $this->organizationService->getOrganization($orgId);
+
+        $this->organizationService->removeOrganizationLogo($organization);
+
+        return $this->respond(null, Response::HTTP_NO_CONTENT);
     }
 
     /** Remove the specified resource from storage. */

@@ -24,7 +24,7 @@ class OrganizationPolicy
 
     public function update(User $user, Organization $organization): bool
     {
-        return $user->isSuperAdmin() || $this->canManageOrganization($user, $organization);
+        return $this->canManageOrganization($user, $organization);
     }
 
     public function delete(User $user, Organization $organization): bool
@@ -48,7 +48,8 @@ class OrganizationPolicy
             return true;
         }
 
-        return $organization->users()->whereKey($user->id)->exists();
+        return (int) $organization->owner_id === (int) $user->id
+            || $organization->users()->whereKey($user->id)->exists();
     }
 
     private function canManageOrganization(User $user, Organization $organization): bool
@@ -61,6 +62,7 @@ class OrganizationPolicy
             return false;
         }
 
-        return $organization->users()->whereKey($user->id)->exists();
+        return (int) $organization->owner_id === (int) $user->id
+            || $organization->users()->whereKey($user->id)->exists();
     }
 }

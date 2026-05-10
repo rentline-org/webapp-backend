@@ -3,9 +3,11 @@
 namespace App\Repositories\Organization;
 
 use App\DTOs\Organization\OrganizationDTO;
+use App\Enums\MediaCollection;
 use App\Models\Organization;
 use App\Models\User;
 use App\Repositories\Contracts\OrganizationRepositoryInterface;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 
@@ -38,9 +40,9 @@ class OrganizationRepository implements OrganizationRepositoryInterface
         return DB::transaction(fn () => Organization::create($data));
     }
 
-    /** {@inheritDoc} */
     public function delete(Organization $organization): bool
     {
+        /** @var Model $organization */
         DB::transaction(function () use ($organization) {
             $organization->users()->detach();
 
@@ -51,13 +53,11 @@ class OrganizationRepository implements OrganizationRepositoryInterface
     }
 
     /** {@inheritDoc} */
-    public function findById(int $id): ?Organization
+    public function findById(int $id): Organization
     {
-        $organization = Organization::find($id)->with(['users', 'contacts', 'media'])->first();
-
-        if ($organization === null) {
-            throw new ModelNotFoundException("Organization with ID {$id} not found.");
-        }
+        $organization = Organization::query()
+            ->with(['users', 'contacts', 'media'])
+            ->findOrFail($id);
 
         return $organization;
     }
@@ -122,5 +122,15 @@ class OrganizationRepository implements OrganizationRepositoryInterface
 
             return $organization->refresh();
         });
+    }
+
+    /** {@inheritDoc} */
+    public function updateLogo(Organization $organization, $logo): Organization
+    {
+
+        $organization->addMedia($logo)->toMediaCollection(MediaCollection::ORGANIZATION->value);
+        $organization->save();
+
+        return $organization->refresh();
     }
 }

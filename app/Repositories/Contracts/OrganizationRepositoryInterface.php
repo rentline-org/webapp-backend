@@ -15,6 +15,8 @@ interface OrganizationRepositoryInterface
 
     public function update(Organization $organization, OrganizationDTO $data): Organization;
 
+    public function updateLogo(Organization $organization, $logo): Organization;
+
     public function delete(Organization $organization): bool;
 
     public function assignUserToOrganization(int $userId, int $organizationId): void;

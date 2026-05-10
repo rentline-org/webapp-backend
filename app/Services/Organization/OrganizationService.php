@@ -3,6 +3,7 @@
 namespace App\Services\Organization;
 
 use App\DTOs\Organization\OrganizationDTO;
+use App\Enums\MediaCollection;
 use App\Models\Organization;
 use App\Models\User;
 use App\Repositories\Contracts\OrganizationRepositoryInterface;
@@ -63,6 +64,18 @@ class OrganizationService
         $newOrganization = $this->organizationRepository->update($existingOrganization, $data);
 
         return $newOrganization;
+    }
+
+    public function updateOrganizationLogo(Organization $organization, $logo)
+    {
+        $updatedOrg = $this->organizationRepository->updateLogo($organization, $logo);
+
+        return $updatedOrg;
+    }
+
+    public function removeOrganizationLogo(Organization $organization)
+    {
+        $organization->clearMediaCollection(MediaCollection::ORGANIZATION->value);
     }
 
     public function deleteOrganization(User $user, int $id): void

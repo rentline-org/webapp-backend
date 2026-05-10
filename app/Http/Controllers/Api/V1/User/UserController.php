@@ -220,11 +220,10 @@ class UserController extends Controller
         $user = $request->user()->load([
             'roles',
             'media',
-            'organizations' => fn ($query) => $query->withCount([
+            'organizations' => fn ($query) => $query->with('media')->withCount([
                 'properties as properties_count' => fn ($q) => $q->withoutGlobalScopes(),
             ]),
         ]);
-        // ->loadCount('organizations.properties');
 
         Gate::authorize('view', $user);
 

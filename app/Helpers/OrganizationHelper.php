@@ -11,7 +11,13 @@ class OrganizationHelper
         $this->organizationId = $id;
     }
 
+    // legacy
     public function get(): ?int
+    {
+        return $this->organizationId;
+    }
+
+    public function getActiveOrgId(): ?int
     {
         return $this->organizationId;
     }

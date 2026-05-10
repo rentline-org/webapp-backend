@@ -230,6 +230,26 @@ class AuthService
         ];
     }
 
+    public function findExistingUserByEmail($email)
+    {
+        $user = User::select([
+            'id',
+            'name',
+            'email',
+            'email_verified_at',
+            'phone',
+            'password',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ])
+            ->where('email', $email)
+            ->with('roles', 'media')
+            ->firstOrFail();
+
+        return $user;
+    }
+
     /**
      * Verify the user before attempting to log in based on configuration.
      *

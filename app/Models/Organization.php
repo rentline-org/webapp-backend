@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\MediaCollection;
 use App\Enums\OrganizationPlan;
 use App\Enums\TaxIDType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -73,6 +74,6 @@ class Organization extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('avatar')->singleFile();
+        $this->addMediaCollection(MediaCollection::ORGANIZATION->value)->useDisk('s3')->singleFile();
     }
 }

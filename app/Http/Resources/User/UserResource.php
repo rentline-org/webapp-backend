@@ -3,7 +3,7 @@
 namespace App\Http\Resources\User;
 
 use App\Enums\MediaCollection;
-use App\Helpers\TenantContextHelper;
+use App\Helpers\OrganizationHelper;
 use App\Http\Resources\Organization\OrganizationResource;
 use App\Http\Resources\Permission\PermissionResource;
 use App\Http\Resources\Role\RoleSlimResource;
@@ -56,25 +56,11 @@ class UserResource extends JsonResource
 
     protected function resolveActiveOrganization(): ?Organization
     {
-        if ($this->resolvedActiveOrg !== null) {
-            return $this->resolvedActiveOrg;
+        $orgId = app(OrganizationHelper::class)->getActiveOrgId();
+        if ($orgId) {
+            return Organization::query()->where('id', $orgId)->with(['media'])->first();
         }
 
-        $activeOrgId = TenantContextHelper::id()
-            ?? $this->resource->currentAccessToken()?->organization_id;
-
-        if (! $activeOrgId) {
-            return $this->resolvedActiveOrg = null;
-        }
-
-        if ($this->resource->relationLoaded('organizations')) {
-            return $this->resolvedActiveOrg =
-                $this->resource->organizations->firstWhere('id', $activeOrgId);
-        }
-
-        return $this->resolvedActiveOrg =
-            $this->resource->organizations()
-                ->whereKey($activeOrgId)
-                ->first();
+        return null;
     }
 }

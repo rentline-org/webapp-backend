@@ -33,20 +33,7 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request)
     {
-        $user = User::select([
-            'id',
-            'name',
-            'email',
-            'email_verified_at',
-            'phone',
-            'password',
-            'is_active',
-            'created_at',
-            'updated_at',
-        ])
-            ->where('email', $request->email)
-            ->with('roles', 'media')
-            ->first();
+        $user = $this->authService->findExistingUserByEmail($request->email);
 
         $authData = $this->authService->login(
             $user,
@@ -75,7 +62,8 @@ class AuthController extends Controller
 
     public function verifyOtp(VerifyOtpRequest $request)
     {
-        $user = User::where('email', $request->email)->first();
+        // $user = User::where('email', $request->email)->first();
+        $user = $this->authService->findExistingUserByEmail($request->email);
 
         $authData = $this->authService->verifyOtpAndLogin(
             $user,
@@ -112,9 +100,9 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        $this->authService->selectOrganization($user, $organization->id);
+        $result = $this->authService->selectOrganization($user, $organization->id);
 
-        return new JsonResponse([], Response::HTTP_NO_CONTENT);
+        return new JsonResponse($result, Response::HTTP_OK);
     }
 
     // forgot password flow

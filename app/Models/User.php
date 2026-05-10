@@ -66,7 +66,7 @@ class User extends Authenticatable implements HasMedia
 
     public function isLandlord(): bool
     {
-        return $this->hasRole(UserRole::LANDLORD);
+        return $this->hasRole('landlord');
     }
 
     public function isTenant(): bool

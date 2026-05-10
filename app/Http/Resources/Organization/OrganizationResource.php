@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Organization;
 
+use App\Enums\MediaCollection;
 use App\Http\Resources\User\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -25,7 +26,7 @@ class OrganizationResource extends JsonResource
         ];
 
         if ($isMediaLoaded) {
-            $data['avatar'] = $this->getFirstMediaUrl('avatar');
+            $data['logo'] = $this->getFirstMedia(MediaCollection::ORGANIZATION->value)?->getUrl();
         }
 
         return $data;
