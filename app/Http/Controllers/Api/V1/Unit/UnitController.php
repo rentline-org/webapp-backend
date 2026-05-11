@@ -50,7 +50,7 @@ class UnitController extends Controller
             UnitDTO::fromRequest($request)
         );
 
-        return new UnitResource($unit);
+        return UnitResource::make($unit);
     }
 
     /** Show a unit */

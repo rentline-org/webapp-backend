@@ -32,6 +32,9 @@ class UnitResource extends JsonResource
             'amenities' => $this->amenities,
             'available_from' => $this->available_from,
             'is_pet_friendly' => $this->is_pet_friendly,
+            'thumbnail' => $this->thumbnail(),
+            'gallery_urls' => $this->galleryUrls(),
+            'media' => $this->whenLoaded('media'),
 
             'property' => PropertyResource::make(
                 $this->whenLoaded('property')
