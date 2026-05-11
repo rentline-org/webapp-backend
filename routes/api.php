@@ -3,10 +3,13 @@
 use App\Http\Controllers\Api\V1\ActiveOrganizationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Spatie\Health\Http\Controllers\HealthCheckJsonResultsController;
 
 Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user();
 });
+
+Route::get('/health', HealthCheckJsonResultsController::class);
 
 // Route::middleware(['auth:sanctum'])->post('select-organization/{organization}', [ActiveOrganizationController::class, 'store']);
 Route::group(['prefix' => 'v1', 'middleware' => ['auth:sanctum']], function () {
