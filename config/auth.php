@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 return [
 
     /*
@@ -66,7 +68,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'model' => env('AUTH_MODEL', User::class),
         ],
 
         // 'users' => [
@@ -139,6 +141,7 @@ return [
             'enabled' => env('AUTH_OTP_ENABLED', false),
             'expiry_minutes' => 5,
             'length' => 6,
+            'resend_cooldown_seconds' => 60,
         ],
 
         'rate_limiting' => [

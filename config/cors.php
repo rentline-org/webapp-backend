@@ -23,10 +23,7 @@ return [
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['Content-Type',
-        'X-Organization-Id',
-        'Authorization',
-        'X-XSRF-TOKEN', ],
+    'allowed_headers' => ['*'],
 
     'exposed_headers' => [],
 

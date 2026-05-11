@@ -8,17 +8,23 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/register', [RegisteredUserController::class, 'store']);
+Route::post('/register', [RegisteredUserController::class, 'store'])
+    ->middleware('web');
 
-Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+Route::post('/login', [AuthenticatedSessionController::class, 'store'])
+    ->middleware('web');
 
-Route::post('/forgot-password', [PasswordResetLinkController::class, 'store']);
+Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
+    ->middleware('web');
 
-Route::post('/reset-password', [NewPasswordController::class, 'store']);
+Route::post('/reset-password', [NewPasswordController::class, 'store'])
+    ->middleware('web');
 
-Route::post('/verify-otp', [OtpVerificationController::class, 'verify']);
+Route::post('/verify-otp', [OtpVerificationController::class, 'verify'])
+    ->middleware(['web', 'throttle:5,1']);
 
-Route::post('/resend-otp', [OtpVerificationController::class, 'resend']);
+Route::post('/resend-otp', [OtpVerificationController::class, 'resend'])
+    ->middleware(['web', 'throttle:5,1']);
 
 // Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)
 //     ->middleware(['auth:sanctum', 'signed', 'throttle:6,1']);
