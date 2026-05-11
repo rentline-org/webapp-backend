@@ -71,50 +71,50 @@ class AuthService
      *
      * @throws ApiException
      */
-    public function login(User $user, string $password, string $device = ''): array
-    {
-        $request = request();
+    // public function login(User $user, string $password, string $device = ''): array
+    // {
+    //     $request = request();
 
-        if ($this->hasTooManyLoginAttempts($request)) {
-            $this->fireLockoutEvent($request);
-            $this->sendLockoutResponse();
-        }
+    //     if ($this->hasTooManyLoginAttempts($request)) {
+    //         $this->fireLockoutEvent($request);
+    //         $this->sendLockoutResponse();
+    //     }
 
-        // Verify user status (Active, Verified, etc.) based on config
-        $this->verifyBeforeLogin($user);
+    //     // Verify user status (Active, Verified, etc.) based on config
+    //     $this->verifyBeforeLogin($user);
 
-        // Verify Password
-        if (! $this->isUserPasswordMatched($user, $password)) {
-            $this->incrementLoginAttempts($request);
-            $this->throwLoginError(self::AUTH_ERROR_INCORRECT_PASSWORD);
-        }
+    //     // Verify Password
+    //     if (! $this->isUserPasswordMatched($user, $password)) {
+    //         $this->incrementLoginAttempts($request);
+    //         $this->throwLoginError(self::AUTH_ERROR_INCORRECT_PASSWORD);
+    //     }
 
-        // Verify OTP if enabled
-        if ($this->shouldVerifyOtp()) {
-            $this->otpService->sendOtp($user);
+    //     // Verify OTP if enabled
+    //     if ($this->shouldVerifyOtp()) {
+    //         $this->otpService->sendOtp($user);
 
-            return [
-                'user' => $user,
-                'token' => null,
-                'status' => self::AUTH_OTP_REQUIRED,
-                'message' => __('messages.otp.sent'),
-            ];
-        }
+    //         return [
+    //             'user' => $user,
+    //             'token' => null,
+    //             'status' => self::AUTH_OTP_REQUIRED,
+    //             'message' => __('messages.otp.sent'),
+    //         ];
+    //     }
 
-        // Success
-        $token = $user->createToken($this->generateTokenKey($user->id, $device) . $user->id)->plainTextToken;
-        $this->clearLoginAttempts($request);
-        $this->authenticated($user, $device);
+    //     // Success
+    //     $token = $user->createToken($this->generateTokenKey($user->id, $device) . $user->id)->plainTextToken;
+    //     $this->clearLoginAttempts($request);
+    //     $this->authenticated($user, $device);
 
-        $user->load('organizations');
+    //     $user->load('organizations');
 
-        return [
-            'user' => $user,
-            'token' => $token,
-            'status' => self::AUTH_SUCCESS_CODE,
-            'message' => __('messages.login.success'),
-        ];
-    }
+    //     return [
+    //         'user' => $user,
+    //         'token' => $token,
+    //         'status' => self::AUTH_SUCCESS_CODE,
+    //         'message' => __('messages.login.success'),
+    //     ];
+    // }
 
     /**
      * Verify OTP and log the user into the application
@@ -122,50 +122,50 @@ class AuthService
      *
      * @throws ApiException
      */
-    public function verifyOtpAndLogin(User $user, string $otp, string $device = ''): array
-    {
-        $request = request();
+    // public function verifyOtpAndLogin(User $user, string $otp, string $device = ''): array
+    // {
+    //     $request = request();
 
-        if ($this->hasTooManyLoginAttempts($request)) {
-            $this->fireLockoutEvent($request);
-            $this->sendLockoutResponse();
-        }
+    //     if ($this->hasTooManyLoginAttempts($request)) {
+    //         $this->fireLockoutEvent($request);
+    //         $this->sendLockoutResponse();
+    //     }
 
-        // Verify OTP
-        if (! $this->otpService->isCorrectOtp($user, $otp)) {
-            $this->incrementLoginAttempts($request);
-            $this->throwLoginError(self::AUTH_ERROR_INCORRECT_OTP);
-        }
+    //     // Verify OTP
+    //     if (! $this->otpService->isCorrectOtp($user, $otp)) {
+    //         $this->incrementLoginAttempts($request);
+    //         $this->throwLoginError(self::AUTH_ERROR_INCORRECT_OTP);
+    //     }
 
-        if ($this->otpService->isOtpExpired($user)) {
-            $this->incrementLoginAttempts($request);
-            $this->throwLoginError(self::AUTH_ERROR_OTP_EXPIRED);
-        }
+    //     if ($this->otpService->isOtpExpired($user)) {
+    //         $this->incrementLoginAttempts($request);
+    //         $this->throwLoginError(self::AUTH_ERROR_OTP_EXPIRED);
+    //     }
 
-        $this->otpService->clearOtp($user);
+    //     $this->otpService->clearOtp($user);
 
-        if (! $user->email_verified_at) {
-            $user->email_verified_at = now();
-            $user->save();
-        }
+    //     if (! $user->email_verified_at) {
+    //         $user->email_verified_at = now();
+    //         $user->save();
+    //     }
 
-        // Verify user status (Active, Verified, etc.) based on config
-        $this->verifyBeforeLogin($user);
+    //     // Verify user status (Active, Verified, etc.) based on config
+    //     $this->verifyBeforeLogin($user);
 
-        // Success
-        $token = $user->createToken($this->generateTokenKey($user->id, $device) . $user->id)->plainTextToken;
-        $this->clearLoginAttempts($request);
-        $this->authenticated($user, $device);
+    //     // Success
+    //     $token = $user->createToken($this->generateTokenKey($user->id, $device) . $user->id)->plainTextToken;
+    //     $this->clearLoginAttempts($request);
+    //     $this->authenticated($user, $device);
 
-        $user->load(['media', 'roles', 'organizations']);
+    //     $user->load(['media', 'roles', 'organizations']);
 
-        return [
-            'user' => $user,
-            'token' => $token,
-            'status' => self::AUTH_SUCCESS_CODE,
-            'message' => __('messages.login.success'),
-        ];
-    }
+    //     return [
+    //         'user' => $user,
+    //         'token' => $token,
+    //         'status' => self::AUTH_SUCCESS_CODE,
+    //         'message' => __('messages.login.success'),
+    //     ];
+    // }
 
     /** Check if the provided password matches the user's current password */
     public function isUserPasswordMatched(User $user, string $password): bool
@@ -266,29 +266,29 @@ class AuthService
      *
      * @throws ApiException
      */
-    protected function verifyBeforeLogin(User $user): void
-    {
-        $config = config('auth.login.verification', []);
+    // protected function verifyBeforeLogin(User $user): void
+    // {
+    //     $config = config('auth.login.verification', []);
 
-        if (($config['check_is_active'] ?? true) && $user->is_active == false) {
-            $this->throwLoginError(self::AUTH_ERROR_INACTIVE);
-        }
+    //     if (($config['check_is_active'] ?? true) && $user->is_active == false) {
+    //         $this->throwLoginError(self::AUTH_ERROR_INACTIVE);
+    //     }
 
-        if (($config['check_email_verified'] ?? true) && ! $user->email_verified_at) {
-            // $this
-            $this->otpService->sendOtp($user);
-            $this->throwLoginError(self::AUTH_ERROR_UNVERIFIED, [
-                'email' => $user->email,
-            ]);
-        }
+    //     if (($config['check_email_verified'] ?? true) && ! $user->email_verified_at) {
+    //         // $this
+    //         $this->otpService->sendOtp($user);
+    //         $this->throwLoginError(self::AUTH_ERROR_UNVERIFIED, [
+    //             'email' => $user->email,
+    //         ]);
+    //     }
 
-        if (($config['check_phone_verified'] ?? false) && ! $user->phone_verified_at) {
-            $this->throwLoginError(self::AUTH_ERROR_UNVERIFIED, [
-                // 'email' => $user->email,
-                'phone' => $user->phone,
-            ]);
-        }
-    }
+    //     if (($config['check_phone_verified'] ?? false) && ! $user->phone_verified_at) {
+    //         $this->throwLoginError(self::AUTH_ERROR_UNVERIFIED, [
+    //             // 'email' => $user->email,
+    //             'phone' => $user->phone,
+    //         ]);
+    //     }
+    // }
 
     protected function shouldVerifyOtp(): bool
     {
