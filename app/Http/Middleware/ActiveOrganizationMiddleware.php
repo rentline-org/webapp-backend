@@ -2,10 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Services\Organization\ActiveOrganizationContext;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class ActiveOrganizationMiddleware
@@ -17,7 +15,7 @@ class ActiveOrganizationMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $user = Auth::user();
+        $user = $request->user();
 
         if (! $user) {
             return $next($request);
@@ -29,10 +27,6 @@ class ActiveOrganizationMiddleware
          * 2. Sanctum token organization_id
          */
         $headerOrgId = $request->header('X-Organization-Id');
-
-        // if (! $headerOrgId) {
-        //     abort(403, 'Select an active organization first');
-        // }
 
         $activeOrgId = $headerOrgId;
 

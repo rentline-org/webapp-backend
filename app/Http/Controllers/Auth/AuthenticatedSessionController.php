@@ -16,7 +16,7 @@ class AuthenticatedSessionController extends Controller
     {
         $user = $request->authenticate();
 
-        if (! $user->email_verified_at) {
+        if (! $user->hasVerifiedEmail()) {
             event(new OtpRequested($user, 'login'));
 
             return $this->respond([
