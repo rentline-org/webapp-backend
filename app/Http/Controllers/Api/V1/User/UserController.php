@@ -21,6 +21,7 @@ use App\Services\Organization\OrganizationService;
 use App\Services\User\UserProfileCacheService;
 use App\Services\User\UserService;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Gate;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
@@ -233,7 +234,7 @@ class UserController extends Controller
             return UserResource::make($freshUser)->resolve($request);
         });
 
-        return $profile;
+        return $this->respond($profile, HttpResponse::HTTP_OK);
     }
 
     /**
