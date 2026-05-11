@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\OtpVerificationController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -34,5 +33,4 @@ Route::post('/resend-otp', [OtpVerificationController::class, 'resend'])
 //     ->middleware(['auth:sanctum', 'throttle:6,1']);
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
-    ->middleware('auth')
-    ->name('logout');
+    ->middleware('auth');

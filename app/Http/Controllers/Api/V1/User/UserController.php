@@ -18,6 +18,7 @@ use App\Http\Resources\User\UserResource;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\Organization\OrganizationService;
+use App\Services\User\UserProfileCacheService;
 use App\Services\User\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -216,18 +217,23 @@ class UserController extends Controller
      */
     public function getProfileData(Request $request)
     {
-
-        $user = $request->user()->load([
-            'roles',
-            'media',
-            'organizations' => fn ($query) => $query->with('media')->withCount([
-                'properties as properties_count' => fn ($q) => $q->withoutGlobalScopes(),
-            ]),
-        ]);
+        $user = $request->user();
 
         Gate::authorize('view', $user);
 
-        return UserResource::make($user);
+        $profile = UserProfileCacheService::remember($user->id, function () use ($user, $request) {
+            $freshUser = $user->load([
+                'roles',
+                'media',
+                'organizations' => fn ($query) => $query->with('media')->withCount([
+                    'properties as properties_count' => fn ($q) => $q->withoutGlobalScopes(),
+                ]),
+            ]);
+
+            return UserResource::make($freshUser)->resolve($request);
+        });
+
+        return $profile;
     }
 
     /**
@@ -246,6 +252,8 @@ class UserController extends Controller
         $data = UserDTO::fromRequest($request, $user);
 
         $updatedUser = $this->userService->updateUserData($data, $user, true);
+
+        UserProfileCacheService::forget($user->id);
 
         return UserResource::make($updatedUser);
     }
@@ -287,6 +295,8 @@ class UserController extends Controller
         $user = $request->user();
         Gate::authorize('update', $user);
         $updatedUser = $this->userService->updateUserAvatar($user, $request->avatar);
+
+        UserProfileCacheService::forget($user->id);
 
         return UserResource::make($updatedUser->load('media'));
     }

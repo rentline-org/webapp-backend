@@ -5,12 +5,11 @@ namespace App\Http\Controllers\Api\V1\Organization;
 use App\DTOs\Organization\OrganizationDTO;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Organization\OrganizationInsertUpdateRequest;
-use App\Http\Requests\Organization\OrganizationLogoUpdateRequest;
 use App\Http\Resources\Organization\OrganizationResource;
 use App\Models\Organization;
 use App\Services\Auth\AuthService;
-use App\Services\Organization\ActiveOrganizationContext;
 use App\Services\Organization\OrganizationService;
+use App\Services\User\UserProfileCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
@@ -48,6 +47,8 @@ class OrganizationController extends Controller
             $this->authService->selectOrganization($user, $newOrganization->id);
         }
 
+        UserProfileCacheService::forget($user->id);
+
         return new OrganizationResource($newOrganization);
     }
 
@@ -70,31 +71,9 @@ class OrganizationController extends Controller
         $organizationDTO = OrganizationDTO::fromRequest($request, $organization);
         $updatedOrganization = $this->organizationService->updateOrganization($user, $organizationDTO);
 
+        UserProfileCacheService::forget($user->id);
+
         return new OrganizationResource($updatedOrganization);
-    }
-
-    public function updateLogo(OrganizationLogoUpdateRequest $request)
-    {
-        $request->validated();
-
-        $orgId = app(ActiveOrganizationContext::class)->id();
-
-        $organization = $this->organizationService->getOrganization($orgId);
-
-        Gate::authorize('update', $organization);
-        $updatedOrg = $this->organizationService->updateOrganizationLogo($organization, $request->logo);
-
-        return OrganizationResource::make($updatedOrg);
-    }
-
-    public function deleteLogo()
-    {
-        $orgId = app(ActiveOrganizationContext::class)->id();
-        $organization = $this->organizationService->getOrganization($orgId);
-
-        $this->organizationService->removeOrganizationLogo($organization);
-
-        return $this->respond(null, Response::HTTP_NO_CONTENT);
     }
 
     /** Remove the specified resource from storage. */
@@ -102,6 +81,8 @@ class OrganizationController extends Controller
     {
         $user = request()->user();
         $this->organizationService->deleteOrganization($user, $organization->id);
+
+        UserProfileCacheService::forget($user->id);
 
         return $this->respond(['message' => 'Organization deleted successfully.'], Response::HTTP_NO_CONTENT);
     }

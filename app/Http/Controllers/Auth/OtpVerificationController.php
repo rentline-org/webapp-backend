@@ -11,6 +11,7 @@ use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Http\Resources\User\UserResource;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\OtpService;
+use App\Services\User\UserProfileCacheService;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
@@ -43,8 +44,10 @@ class OtpVerificationController extends Controller
         $this->otpService->clearOtp($user);
 
         if ($user->markEmailAsVerified()) {
-            event(new Verified($request->user()));
+            event(new Verified($user));
         }
+
+        UserProfileCacheService::forget($user->id);
 
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
