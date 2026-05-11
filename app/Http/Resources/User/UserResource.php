@@ -3,11 +3,11 @@
 namespace App\Http\Resources\User;
 
 use App\Enums\MediaCollection;
-use App\Helpers\OrganizationHelper;
 use App\Http\Resources\Organization\OrganizationResource;
 use App\Http\Resources\Permission\PermissionResource;
 use App\Http\Resources\Role\RoleSlimResource;
 use App\Models\Organization;
+use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Resources\MissingValue;
@@ -56,7 +56,8 @@ class UserResource extends JsonResource
 
     protected function resolveActiveOrganization(): ?Organization
     {
-        $orgId = app(OrganizationHelper::class)->getActiveOrgId();
+        $orgId = app(ActiveOrganizationContext::class)->id();
+
         if ($orgId) {
             return Organization::query()->where('id', $orgId)->with(['media'])->first();
         }

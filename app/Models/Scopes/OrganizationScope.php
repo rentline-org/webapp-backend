@@ -2,7 +2,7 @@
 
 namespace App\Models\Scopes;
 
-use App\Helpers\OrganizationHelper;
+use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -22,7 +22,7 @@ class OrganizationScope implements Scope
             return;
         }
 
-        $orgId = app(OrganizationHelper::class)->get();
+        $orgId = app(ActiveOrganizationContext::class)->id();
 
         if (! $orgId) {
             return;

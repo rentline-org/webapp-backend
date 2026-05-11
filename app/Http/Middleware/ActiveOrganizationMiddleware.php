@@ -2,9 +2,10 @@
 
 namespace App\Http\Middleware;
 
-use App\Helpers\OrganizationHelper;
+use App\Services\Organization\ActiveOrganizationContext;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class ActiveOrganizationMiddleware
@@ -16,7 +17,7 @@ class ActiveOrganizationMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        $user = Auth::user();
 
         if (! $user) {
             return $next($request);
@@ -29,9 +30,9 @@ class ActiveOrganizationMiddleware
          */
         $headerOrgId = $request->header('X-Organization-Id');
 
-        if (! $headerOrgId) {
-            abort(403, 'Select an active organization first');
-        }
+        // if (! $headerOrgId) {
+        //     abort(403, 'Select an active organization first');
+        // }
 
         $activeOrgId = $headerOrgId;
 
@@ -45,12 +46,8 @@ class ActiveOrganizationMiddleware
             abort(403, 'Invalid organization for this user.');
         }
 
-        /**
-         * Store active organization in singleton helper
-         */
-        app(OrganizationHelper::class)->set(
-            $activeOrgId ? (int) $activeOrgId : null
-        );
+        // app(ActiveOrganizationContext::class)->set($activeOrgId);
+        $request->attributes->set('active_org_id', $activeOrgId);
 
         return $next($request);
     }

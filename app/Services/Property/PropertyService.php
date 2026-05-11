@@ -4,10 +4,10 @@ namespace App\Services\Property;
 
 use App\DTOs\Property\PropertyDTO;
 use App\DTOs\Unit\UnitDTO;
-use App\Helpers\OrganizationHelper;
 use App\Models\Property;
 use App\Repositories\Contracts\PropertyRepositoryInterface;
 use App\Repositories\Contracts\UnitRepositoryInterface;
+use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use RuntimeException;
@@ -63,7 +63,7 @@ class PropertyService
      */
     public function create(PropertyDTO $dto, array $units): Property
     {
-        $organizationId = app(OrganizationHelper::class)->get();
+        $organizationId = app(ActiveOrganizationContext::class)->id();
 
         if (! $organizationId) {
             throw new RuntimeException('No active organization context found.');

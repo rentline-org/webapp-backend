@@ -3,10 +3,10 @@
 namespace App\Providers;
 
 use App\Helpers\OrganizationHelper;
-use App\Models\User;
+use App\Services\Organization\ActiveOrganizationContext;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -26,12 +26,16 @@ class AppServiceProvider extends ServiceProvider
                 ->by($request->user()?->id ?: $request->ip());
         });
 
-        // Gate::define('viewPulse', function (User $user) {
-        //     return $user->isAdmin();
-        // });
-
-        $this->app->singleton(OrganizationHelper::class, function () {
-            return new OrganizationHelper;
+        ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
+            return config('app.frontend_url') . "/password-reset/$token?email={$notifiable->getEmailForPasswordReset()}";
         });
+
+        $this->app->scoped(ActiveOrganizationContext::class, function () {
+            return new ActiveOrganizationContext;
+        });
+
+        // $this->app->singleton(OrganizationHelper::class, function () {
+        //     return new OrganizationHelper;
+        // });
     }
 }

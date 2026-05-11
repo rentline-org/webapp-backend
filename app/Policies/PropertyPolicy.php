@@ -2,9 +2,9 @@
 
 namespace App\Policies;
 
-use App\Helpers\OrganizationHelper;
 use App\Models\Property;
 use App\Models\User;
+use App\Services\Organization\ActiveOrganizationContext;
 
 class PropertyPolicy
 {
@@ -66,7 +66,7 @@ class PropertyPolicy
             return false;
         }
 
-        $activeOrgId = app(OrganizationHelper::class)->get();
+        $activeOrgId = app(ActiveOrganizationContext::class)->id();
 
         return $activeOrgId && $property->organization_id === $activeOrgId;
     }
@@ -93,7 +93,7 @@ class PropertyPolicy
             return false;
         }
 
-        $activeOrgId = app(OrganizationHelper::class)->get();
+        $activeOrgId = app(ActiveOrganizationContext::class)->id();
 
         return $activeOrgId && $property->organization_id === $activeOrgId;
     }

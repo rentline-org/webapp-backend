@@ -2,7 +2,14 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
+use Illuminate\Auth\Events\Lockout;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
@@ -15,37 +22,66 @@ class LoginRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'email' => 'required|exists:users,email',
-            'password' => 'required|string|min:6',
-            'device' => 'required|string|max:100',
+            'email' => ['required', 'string', 'email'],
+            'password' => ['required', 'string'],
         ];
     }
 
     /**
-     * Get the body parameters for API documentation.
+     * Attempt to authenticate the request's credentials.
      *
-     * @return array
+     * @throws ValidationException
      */
-    public function bodyParameters()
+    public function authenticate(): User
     {
-        return [
-            'email' => [
-                'description' => 'User email address',
-                'example' => 'superadmin@ims.com',
-            ],
-            'password' => [
-                'description' => 'User password (minimum 6 characters)',
-                'example' => '123456',
-            ],
-            'device' => [
-                'description' => 'Device identifier for login tracking',
-                'example' => 'mobile_app',
-            ],
-        ];
+        $this->ensureIsNotRateLimited();
+
+        $user = User::query()->where('email', $this->email)->first();
+
+        if (! $user || ! Hash::check($this->password, $user->password)) {
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => __('auth.failed'),
+            ]);
+        }
+
+        RateLimiter::clear($this->throttleKey());
+
+        return $user;
+    }
+
+    /**
+     * Ensure the login request is not rate limited.
+     *
+     * @throws ValidationException
+     */
+    public function ensureIsNotRateLimited(): void
+    {
+        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+            return;
+        }
+
+        event(new Lockout($this));
+
+        $seconds = RateLimiter::availableIn($this->throttleKey());
+
+        throw ValidationException::withMessages([
+            'email' => trans('auth.throttle', [
+                'seconds' => $seconds,
+                'minutes' => ceil($seconds / 60),
+            ]),
+        ]);
+    }
+
+    /** Get the rate limiting throttle key for the request. */
+    public function throttleKey(): string
+    {
+        return Str::transliterate(Str::lower($this->input('email')) . '|' . $this->ip());
     }
 }

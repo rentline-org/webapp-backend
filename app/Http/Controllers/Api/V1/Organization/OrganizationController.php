@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api\V1\Organization;
 
 use App\DTOs\Organization\OrganizationDTO;
-use App\Helpers\OrganizationHelper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Organization\OrganizationInsertUpdateRequest;
 use App\Http\Requests\Organization\OrganizationLogoUpdateRequest;
 use App\Http\Resources\Organization\OrganizationResource;
 use App\Models\Organization;
 use App\Services\Auth\AuthService;
+use App\Services\Organization\ActiveOrganizationContext;
 use App\Services\Organization\OrganizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -77,7 +77,7 @@ class OrganizationController extends Controller
     {
         $request->validated();
 
-        $orgId = app(OrganizationHelper::class)->getActiveOrgId();
+        $orgId = app(ActiveOrganizationContext::class)->id();
 
         $organization = $this->organizationService->getOrganization($orgId);
 
@@ -89,7 +89,7 @@ class OrganizationController extends Controller
 
     public function deleteLogo()
     {
-        $orgId = app(OrganizationHelper::class)->getActiveOrgId();
+        $orgId = app(ActiveOrganizationContext::class)->id();
         $organization = $this->organizationService->getOrganization($orgId);
 
         $this->organizationService->removeOrganizationLogo($organization);

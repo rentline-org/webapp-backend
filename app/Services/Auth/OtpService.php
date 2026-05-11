@@ -3,98 +3,116 @@
 namespace App\Services\Auth;
 
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Resend\Laravel\Facades\Resend;
+use Illuminate\Validation\ValidationException;
 
 class OtpService
 {
     private const USER_OTP_PREFIX = 'OTP_';
+    private const OTP_RESEND_PREFIX = 'OTP_RESEND_';
 
-    /**
-     * __construct
-     *
-     * @return void
-     */
-    public function __construct() {}
-
-    /**
-     * generate  phone verification code and store them in cache.
-     *
-     * @param  int    $time in minutes
-     * @return string code
-     */
-    public function generateOtpCode(User $user, $time)
+    public function issueOtp(User $user, ?int $expiryMinutes = null): string
     {
-        // forget existing otp from cache
-        Cache::forget(self::USER_OTP_PREFIX . $user->id);
+        $expiryMinutes ??= config('auth.login.otp.expiry_minutes', 5);
 
-        // generate code
-        $length = config('auth.login.otp.length', 6);
-        $min = pow(10, $length - 1);
-        $max = pow(10, $length) - 1;
-        $code = mt_rand($min, $max);
+        $this->clearOtp($user);
 
-        // put them in cache
-        Cache::put(self::USER_OTP_PREFIX . $user->id, $code, now()->addMinutes($time));
-        $user->last_otp = $code;
-        $user->save();
+        $code = $this->generateOtpCode();
 
-        // return generated code
+        Cache::put(
+            $this->cacheKey($user),
+            $code,
+            now()->addMinutes($expiryMinutes)
+        );
+
+        $this->markSentAt($user);
+
         return $code;
     }
 
-    /**
-     * check if the OTP is expired from cache or not
-     *
-     * @return bool
-     */
-    public function isOtpExpired(User $user)
+    public function verifyOtp(User $user, string $code): bool
     {
-        $cachedCode = Cache::get(self::USER_OTP_PREFIX . $user->id);
 
-        return (bool) (! $cachedCode);
+        if ($this->isOtpExpired($user)) {
+            return false;
+        }
+
+        $cachedCode = $this->getCachedOtp($user);
+
+        if ($cachedCode === null) {
+            return false;
+        }
+
+        return hash_equals($cachedCode, $this->normalizeOtp($code));
     }
 
-    /**
-     * check if the OTP is correct
-     *
-     * @param  string $code
-     * @return bool
-     */
-    public function isCorrectOtp(User $user, $code)
+    public function isOtpExpired(User $user): bool
     {
-        $cachedCode = Cache::get(self::USER_OTP_PREFIX . $user->id);
-
-        return ! ($code != $cachedCode);
+        return $this->getCachedOtp($user) === null;
     }
 
-    /**
-     * Clear the OTP from cache
-     *
-     * @return void
-     */
-    public function clearOtp(User $user)
+    public function clearOtp(User $user): void
     {
-        Cache::forget(self::USER_OTP_PREFIX . $user->id);
+        Cache::forget($this->cacheKey($user));
     }
 
-    /**
-     * send Otp to a user
-     *
-     * @return void
-     */
-    public function sendOtp(User $user)
+    private function ensureCanResend(User $user): void
     {
-        // $phone = $user->phone;
-        $expiryMinutes = config('auth.login.otp.expiry_minutes', 5);
-        $otp = $this->generateOtpCode($user, $expiryMinutes);
-        $body = "{$otp} is your OTP";
+        $cooldownSeconds = 60;
+        $lastSentAt = Cache::get($this->resendKey($user));
 
-        Resend::emails()->send([
-            'from' => 'Rentline System <onboarding@system.rentline.io>',
-            'to' => $user->email,
-            'subject' => 'Your OTP Code',
-            'html' => "<p>{$body}</p>",
-        ]);
+        if (! $lastSentAt) {
+            return;
+        }
+
+        if (now()->diffInSeconds(Carbon::parse($lastSentAt)) < $cooldownSeconds) {
+            throw ValidationException::withMessages([
+                'otp' => 'OTP code expired',
+            ]);
+        }
+    }
+
+    private function generateOtpCode(): string
+    {
+        $length = (int) config('auth.login.otp.length', 6);
+
+        $min = (int) pow(10, $length - 1);
+        $max = (int) pow(10, $length) - 1;
+
+        return (string) random_int($min, $max);
+    }
+
+    private function getCachedOtp(User $user): ?string
+    {
+        $value = Cache::get($this->cacheKey($user));
+
+        return $value !== null ? (string) $value : null;
+    }
+
+    private function cacheKey(User $user): string
+    {
+        return self::USER_OTP_PREFIX . $user->id;
+    }
+
+    private function normalizeOtp(string $code): string
+    {
+        return trim($code);
+    }
+
+    private function resendKey(User $user): string
+    {
+        return self::OTP_RESEND_PREFIX . $user->id;
+    }
+
+    private function markSentAt(User $user): void
+    {
+        $cooldownSeconds = (int) config('auth.login.otp.resend_cooldown_seconds', 60);
+
+        Cache::put(
+            $this->resendKey($user),
+            now()->toIso8601String(),
+            now()->addSeconds($cooldownSeconds)
+        );
     }
 }

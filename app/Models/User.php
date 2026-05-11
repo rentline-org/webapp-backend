@@ -6,6 +6,7 @@ namespace App\Models;
 use App\Enums\MediaCollection;
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -18,7 +19,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable implements HasMedia
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, InteractsWithMedia, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, InteractsWithMedia, MustVerifyEmail, Notifiable;
 
     /**
      * The attributes that are mass assignable.

@@ -1,8 +1,7 @@
 <?php
 
-use App\Enums\UserRole;
-use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,8 +14,8 @@ use Illuminate\Support\Facades\DB;
 |
 */
 
-pest()->extend(Tests\TestCase::class)
- // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
@@ -48,70 +47,4 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
-}
-
-function generateUser()
-{
-    $user = User::factory()->create();
-    $user->assignRole(UserRole::TENANT);
-
-    return $user;
-}
-
-function generateSuperAdmin()
-{
-    DB::table('users')->where('id', '=', UserRole::SUPER_ADMIN->id())->delete();
-    $user = User::factory()->create();
-    $user->id = UserRole::SUPER_ADMIN->id();
-    $user->save();
-    $user->assignRole(UserRole::SUPER_ADMIN);
-
-    return $user;
-}
-
-function generateAdmin()
-{
-    $user = User::factory()->create();
-    $user->assignRole(UserRole::LANDLORD);
-
-    return $user;
-}
-
-function generateUserAndAuthToken()
-{
-    $user = User::factory()->create();
-    $user->assignRole(UserRole::TENANT);
-    $token = $user->createToken('test')->plainTextToken;
-
-    return [
-        'user' => $user,
-        'token' => $token,
-    ];
-}
-
-function generateAdminUserAndAuthToken()
-{
-    $user = User::factory()->create();
-    $user->assignRole(UserRole::LANDLORD);
-    $token = $user->createToken('test')->plainTextToken;
-
-    return [
-        'user' => $user,
-        'token' => $token,
-    ];
-}
-
-function generateSuperAdminUserAndAuthToken()
-{
-    DB::table('users')->where('id', '=', UserRole::SUPER_ADMIN->id())->delete();
-    $user = User::factory()->create();
-    $user->id = UserRole::SUPER_ADMIN->id();
-    $user->save();
-    $user->assignRole(UserRole::SUPER_ADMIN);
-    $token = $user->createToken('test')->plainTextToken;
-
-    return [
-        'user' => $user,
-        'token' => $token,
-    ];
 }

@@ -5,6 +5,7 @@ namespace App\Services\Auth;
 use App\Enums\ApiErrorCode;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Events\OtpRequested;
 use App\Exceptions\ApiException;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
@@ -14,10 +15,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Laravel\Sanctum\PersonalAccessToken;
-use LogicException;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthService
@@ -58,11 +56,10 @@ class AuthService
         $role = UserRole::from($request->role);
         $user->assignRole($role);
 
-        $this->otpService->sendOtp($user);
+        event(new OtpRequested($user, 'register'));
 
         return [
             'user' => $user,
-            'token' => null,
             'status' => self::AUTH_OTP_REQUIRED,
             'message' => __('messages.otp.sent'),
         ];
@@ -191,41 +188,17 @@ class AuthService
             ->delete();
     }
 
-    // After login is finished select an organization and update the user's existing personal access token
     public function selectOrganization(User $user, int $organizationId): array
     {
-        $token = $user->currentAccessToken();
-
-        if (! $token) {
-            throw new LogicException('No active token found for the user.');
-        }
-
         if (! $user->organizations()->whereKey($organizationId)->exists()) {
             throw new AuthorizationException('User does not belong to this organization.');
         }
 
-        $tokenModel = PersonalAccessToken::query()->findOrFail($token->id);
-
-        $currentOrgId = $tokenModel->organization_id;
-
-        if ((int) $currentOrgId === $organizationId) {
-            return [
-                'organization_id' => $organizationId,
-                'active_organization' => $this->organizationService->getOrganization($organizationId),
-                'changed' => false,
-            ];
-        }
-
-        DB::transaction(function () use ($tokenModel, $organizationId): void {
-            $tokenModel->organization_id = $organizationId;
-            $tokenModel->save();
-        });
-
-        $tokenModel->refresh();
+        $organization = $this->organizationService->getOrganization($organizationId);
 
         return [
-            'organization_id' => $tokenModel->organization_id,
-            'active_organization' => $this->organizationService->getOrganization($tokenModel->organization_id),
+            'organization_id' => $organizationId,
+            'active_organization' => $organization,
             'changed' => true,
         ];
     }
@@ -248,6 +221,44 @@ class AuthService
             ->firstOrFail();
 
         return $user;
+    }
+
+    /**
+     * Throw a login error exception
+     *
+     * @throws ApiException
+     */
+    public function throwLoginError(string $errorCode, array $additional_data = []): void
+    {
+        $responseCode = Response::HTTP_BAD_REQUEST;
+
+        $errorMessage = match ($errorCode) {
+            self::AUTH_ERROR_INACTIVE => __('messages.login.inactive'),
+            self::AUTH_ERROR_UNVERIFIED => __('messages.login.unverified'),
+            self::AUTH_ERROR_INCORRECT_PASSWORD => __('messages.login.invalid.password'),
+            self::AUTH_ERROR_INCORRECT_OTP => __('messages.login.invalid.otp'),
+            self::AUTH_ERROR_OTP_EXPIRED => __('messages.login.expired.otp'),
+            self::AUTH_ERROR_LOCKOUT => __('messages.login.lockout'),
+            default => __('messages.login.fail.general'),
+        };
+
+        $responseCode = match ($errorCode) {
+            self::AUTH_ERROR_INCORRECT_PASSWORD => Response::HTTP_BAD_REQUEST,
+            self::AUTH_ERROR_UNVERIFIED => Response::HTTP_FORBIDDEN,
+            self::AUTH_ERROR_INACTIVE => Response::HTTP_FORBIDDEN,
+            self::AUTH_ERROR_LOCKOUT => Response::HTTP_LOCKED,
+            self::AUTH_ERROR_OTP_EXPIRED => Response::HTTP_BAD_REQUEST,
+            self::AUTH_ERROR_INCORRECT_OTP => Response::HTTP_BAD_REQUEST,
+            default => Response::HTTP_BAD_REQUEST,
+        };
+
+        throw new ApiException(
+            $responseCode,
+            $errorCode,
+            $errorMessage,
+            __('messages.login.fail.general'),
+            $additional_data
+        );
     }
 
     /**
@@ -327,44 +338,6 @@ class AuthService
             ApiErrorCode::RATE_LIMIT_EXCEEDED->value,
             __('messages.login.lockout'),
             __('messages.login.fail.general')
-        );
-    }
-
-    /**
-     * Throw a login error exception
-     *
-     * @throws ApiException
-     */
-    protected function throwLoginError(string $errorCode, array $additional_data = []): void
-    {
-        $responseCode = Response::HTTP_BAD_REQUEST;
-
-        $errorMessage = match ($errorCode) {
-            self::AUTH_ERROR_INACTIVE => __('messages.login.inactive'),
-            self::AUTH_ERROR_UNVERIFIED => __('messages.login.unverified'),
-            self::AUTH_ERROR_INCORRECT_PASSWORD => __('messages.login.invalid.password'),
-            self::AUTH_ERROR_INCORRECT_OTP => __('messages.login.invalid.otp'),
-            self::AUTH_ERROR_OTP_EXPIRED => __('messages.login.expired.otp'),
-            self::AUTH_ERROR_LOCKOUT => __('messages.login.lockout'),
-            default => __('messages.login.fail.general'),
-        };
-
-        $responseCode = match ($errorCode) {
-            self::AUTH_ERROR_INCORRECT_PASSWORD => Response::HTTP_BAD_REQUEST,
-            self::AUTH_ERROR_UNVERIFIED => Response::HTTP_FORBIDDEN,
-            self::AUTH_ERROR_INACTIVE => Response::HTTP_FORBIDDEN,
-            self::AUTH_ERROR_LOCKOUT => Response::HTTP_LOCKED,
-            self::AUTH_ERROR_OTP_EXPIRED => Response::HTTP_BAD_REQUEST,
-            self::AUTH_ERROR_INCORRECT_OTP => Response::HTTP_BAD_REQUEST,
-            default => Response::HTTP_BAD_REQUEST,
-        };
-
-        throw new ApiException(
-            $responseCode,
-            $errorCode,
-            $errorMessage,
-            __('messages.login.fail.general'),
-            $additional_data
         );
     }
 
