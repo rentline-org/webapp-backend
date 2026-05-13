@@ -19,10 +19,10 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 class Property extends Model implements HasMedia
 {
     use HasFactory, HasGallery, HasSlug, HasThumbnail, InteractsWithMedia;
+    public string $thumbnailCollection = MediaCollection::PROPERTY_THUMB->value;
+    public string $galleryCollection = MediaCollection::PROPERTY_GALLERY->value;
 
     protected $slugField = 'title';
-    protected string $thumbnailCollection = MediaCollection::PROPERTY_THUMB->value;
-    protected string $galleryCollection = MediaCollection::PROPERTY_GALLERY->value;
 
     protected $fillable = [
         'organization_id',

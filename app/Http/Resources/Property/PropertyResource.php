@@ -40,6 +40,7 @@ class PropertyResource extends JsonResource
             'sale_types' => $this->sale_types,
             'thumbnail' => $this->thumbnail(),
             'gallery_urls' => $this->gallery(),
+            'media' => $this->whenLoaded('media'),
 
             'organization' => OrganizationResource::make(
                 $this->whenLoaded('organization')

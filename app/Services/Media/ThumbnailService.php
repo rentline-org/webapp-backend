@@ -12,7 +12,7 @@ class ThumbnailService
     {
         $model->clearMediaCollection($model->thumbnailCollection);
 
-        return $model->load('media');
+        return $model->load(['media']);
     }
 
     /** Store thumbnail for model. */
@@ -23,6 +23,6 @@ class ThumbnailService
         $model->addMedia($thumbnail)
             ->toMediaCollection($model->thumbnailCollection);
 
-        return $model->load('media');
+        return $model->load(['media']);
     }
 }

@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\V1\Property;
 use App\Enums\PropertyType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Media\ThumbnailInsertRequest;
+use App\Http\Resources\Property\PropertyResource;
 use App\Models\Property;
 use App\Services\Media\ThumbnailService;
+use Symfony\Component\HttpFoundation\Response;
 
 class PropertyThumbnailController extends Controller
 {
@@ -22,18 +24,18 @@ class PropertyThumbnailController extends Controller
         $property = $this->thumbnailService->storeThumbnail($property, $validated_payload['thumbnail']);
 
         return $this->respond([
-            'property' => $property,
+            'property' => PropertyResource::make($property),
             'message' => 'Property thumbnail uploaded',
-        ]);
+        ], Response::HTTP_CREATED);
     }
 
     public function destroy(Property $property)
     {
         abort_unless($property->property_type === PropertyType::MULTI_UNIT, 422, $this->wrongPropertyTypeMessage);
 
-        $deletedProperty = $this->thumbnailService->deleteThumbnail($property);
+        $property = $this->thumbnailService->deleteThumbnail($property);
         $this->respond([
-            'property' => $deletedProperty,
+            'property' => PropertyResource::make($property),
             'message' => 'Deleted property successfully',
         ]);
     }
