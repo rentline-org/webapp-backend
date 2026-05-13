@@ -30,9 +30,7 @@ class PropertyResource extends JsonResource
             'property_type' => $this->property_type,
             'is_available' => $this->is_available,
             'is_furnished' => $this->is_furnished,
-            'rent_price' => $this->rent_price,
             'sale_price' => $this->sale_price,
-            'buy_price' => $this->buy_price,
             'bedrooms' => $this->bedrooms,
             'bathrooms' => $this->bathrooms,
             'square_feet' => $this->square_feet,
@@ -40,6 +38,8 @@ class PropertyResource extends JsonResource
             'available_from' => $this->available_from,
             'is_pet_friendly' => $this->is_pet_friendly,
             'sale_types' => $this->sale_types,
+            'thumbnail' => $this->thumbnail(),
+            'gallery_urls' => $this->gallery(),
 
             'organization' => OrganizationResource::make(
                 $this->whenLoaded('organization')

@@ -2,21 +2,27 @@
 
 namespace App\Models;
 
+use App\Enums\MediaCollection;
 use App\Enums\PropertyType;
 use App\Enums\UnitType;
 use App\Helpers\OrganizationHelper;
 use App\Models\Scopes\OrganizationScope;
+use App\Traits\HasGallery;
 use App\Traits\HasSlug;
+use App\Traits\HasThumbnail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Property extends Model
+class Property extends Model implements HasMedia
 {
-    use HasFactory, HasSlug;
+    use HasFactory, HasGallery, HasSlug, HasThumbnail, InteractsWithMedia;
 
     protected $slugField = 'title';
+    protected string $thumbnailCollection = MediaCollection::PROPERTY_THUMB->value;
+    protected string $galleryCollection = MediaCollection::PROPERTY_GALLERY->value;
 
     protected $fillable = [
         'organization_id',
@@ -72,6 +78,12 @@ class Property extends Model
         return $this->property_type == PropertyType::MULTI_UNIT;
     }
 
+    public function registerMediaCollections(): void
+    {
+        $this->registerThumbnailCollection();
+        $this->registerGalleryCollection();
+    }
+
     protected static function booted(): void
     {
         static::addGlobalScope(new OrganizationScope);
@@ -82,37 +94,10 @@ class Property extends Model
             }
         });
 
-        // static::saving(function ($property) {
-        //     if ($property->isDirty('title')) {
-        //         $baseSlug = Str::slug($property->title);
-        //         $slug = $baseSlug;
-        //         $count = 1;
-
-        //         while (
-        //             static::query()
-        //                 ->where('slug', $slug)
-        //                 ->where('id', '!=', $property->id)
-        //                 ->exists()
-        //         ) {
-        //             $slug = "{$baseSlug}-{$count}";
-        //             $count++;
-        //         }
-
-        //         $property->slug = $slug;
-        //     }
-        // });
-
         static::created(function (Property $property) {
             if ($property->units()->exists()) {
                 return;
             }
-
-            // if ($property->property_type === PropertyType::SINGLE_UNIT) {
-            //     $property->units()->create([
-            //         'name' => $property->title,
-            //         'unit_type' => UnitType::HOUSE,
-            //     ]);
-            // }
 
             if ($property->property_type === PropertyType::LAND) {
                 $property->units()->create([

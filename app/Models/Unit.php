@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Enums\MediaCollection;
 use App\Enums\PropertyType;
 use App\Enums\UnitType;
+use App\Traits\HasGallery;
 use App\Traits\HasSlug;
+use App\Traits\HasThumbnail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +16,9 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Unit extends Model implements HasMedia
 {
-    use HasFactory, HasSlug, InteractsWithMedia;
+    use HasFactory, HasGallery, HasSlug, HasThumbnail, InteractsWithMedia;
+    public string $thumbnailCollection = MediaCollection::UNIT_THUMB->value;
+    public string $galleryCollection = MediaCollection::UNIT_GALLERY->value;
 
     protected $slugField = 'name';
     protected $slugUniqueBy = 'property_id';
@@ -68,34 +72,8 @@ class Unit extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection(MediaCollection::UNIT_THUMB->value)->useDisk('s3')->singleFile();
-        $this->addMediaCollection(MediaCollection::UNIT_GALLERY->value)->useDisk('s3');
-    }
-
-    public function thumbnail(): ?array
-    {
-        $media = $this->getFirstMedia(MediaCollection::UNIT_THUMB->value);
-
-        if (! $media) {
-            return null;
-        }
-
-        return [
-            'id' => $media->id,
-            'url' => $media->getUrl(),
-        ];
-    }
-
-    public function galleryUrls(): array
-    {
-        return $this->getMedia(MediaCollection::UNIT_GALLERY->value)
-            ->map(fn ($media) => [
-                'id' => $media->id,
-                'url' => $media->getUrl(),
-                'name' => $media->name,
-            ])
-            ->values()
-            ->all();
+        $this->registerThumbnailCollection();
+        $this->registerGalleryCollection();
     }
 
     protected static function booted(): void
