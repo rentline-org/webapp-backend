@@ -9,6 +9,7 @@ class UnitGalleryService
 {
     /**
      * __construct
+     *a
      *
      * @return void
      */
@@ -35,6 +36,18 @@ class UnitGalleryService
     public function clearGallery(Unit $unit): Unit
     {
         $unit->clearMediaCollection(MediaCollection::UNIT_GALLERY->value);
+
+        return $unit;
+    }
+
+    public function updateGalleryImageName(Unit $unit, int $mediaId, string $name): Unit
+    {
+        $media = $unit->media()
+            ->where('collection_name', MediaCollection::UNIT_GALLERY->value)
+            ->findOrFail($mediaId);
+
+        $media['name'] = $name;
+        $media->save();
 
         return $unit;
     }

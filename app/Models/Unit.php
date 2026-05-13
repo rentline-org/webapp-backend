@@ -92,6 +92,7 @@ class Unit extends Model implements HasMedia
             ->map(fn ($media) => [
                 'id' => $media->id,
                 'url' => $media->getUrl(),
+                'name' => $media->name,
             ])
             ->values()
             ->all();

@@ -59,6 +59,26 @@ class UnitMediaController extends Controller
         ], Response::HTTP_CREATED);
     }
 
+    public function updateGalleryImageName(Request $request, Property $property, Unit $unit, Media $media)
+    {
+        abort_unless($unit->property_id === $property->id, 404);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $unit = $this->unitGalleryService->updateGalleryImageName(
+            $unit,
+            $media->id,
+            $validated['name']
+        );
+
+        return $this->respond([
+            'message' => 'Gallery image name updated',
+            'unit' => UnitResource::make($unit),
+        ]);
+    }
+
     public function destroyGalleryImage(Property $property, Unit $unit, Media $media)
     {
         abort_unless($unit->property_id === $property->id, 404);

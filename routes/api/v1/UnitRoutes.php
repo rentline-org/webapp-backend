@@ -9,6 +9,7 @@ Route::group(['prefix' => 'v1', 'middleware' => ['auth:sanctum']], function () {
 
     Route::post('properties/{property}/units/{unit}/media/gallery', [UnitMediaController::class, 'storeGallery']);
     Route::post('properties/{property}/units/{unit}/media/thumbnail', [UnitMediaController::class, 'storeThumbnail']);
+    Route::patch('properties/{property}/units/{unit}/media/gallery/{media}', [UnitMediaController::class, 'updateGalleryImageName']);
 
     Route::delete('properties/{property}/units/{unit}/media/gallery/{media}', [UnitMediaController::class, 'destroyGalleryImage']);
     Route::delete('properties/{property}/units/{unit}/media/thumbnail', [UnitMediaController::class, 'destroyThumbnail']);
