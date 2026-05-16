@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'enabled' => env('OBSERVABILITY_ENABLED', true),
+    'enabled' => env('OBSERVABILITY_ENABLED', false),
 
     /*
     |--------------------------------------------------------------------------

@@ -23,6 +23,19 @@ class OrganizationService
         protected OrganizationRepositoryInterface $organizationRepository
     ) {}
 
+    public function getResolvedActiveOrg()
+    {
+        $activeOrgContext = app(ActiveOrganizationContext::class);
+
+        if (! $activeOrgContext->hasOrganization()) {
+            throw new DomainException('No active organization found');
+        }
+
+        return Organization::query()
+            ->with(['users'])
+            ->findOrFail($activeOrgContext->id());
+    }
+
     public function getUserOrganizations(User $user): array
     {
         return $this->organizationRepository->getAllUserOrganizations($user->id);

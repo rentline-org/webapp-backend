@@ -9,7 +9,7 @@ Route::group(['prefix' => 'v1', 'middleware' => ['auth:sanctum']], function () {
     Route::apiResource('properties', PropertyController::class)->scoped();
     Route::get('properties/slug/{slug}', [PropertyController::class, 'showBySlug'])->name('properties.showBySlug');
 
-    Route::post('properties/{property}/media/thumbnail', [PropertyThumbnailController::class, 'store'])->scopeBindings();
+    Route::post('properties/{property}/media/thumbnail', [PropertyThumbnailController::class, 'store']);
     Route::delete('properties/{property}/media/thumbnail', [PropertyThumbnailController::class, 'destroy']);
 
     Route::post('properties/{property}/media/gallery', [PropertyGalleryController::class, 'store']);

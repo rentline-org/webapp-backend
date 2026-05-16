@@ -3,7 +3,7 @@
     "name": "rentline-backend/api",
     "type": "project",
     "description": "Rentline Backend API.",
-    "keywords": ["laravel", "framework", "api", "starter", "template", "ims"],
+    "keywords": ["laravel", "framework", "api"],
     "license": "MIT",
     "require": {
         "php": "^8.2",

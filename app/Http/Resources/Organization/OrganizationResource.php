@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Organization;
 
 use App\Enums\MediaCollection;
+use App\Http\Resources\Listing\ListingResource;
 use App\Http\Resources\User\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -23,6 +24,7 @@ class OrganizationResource extends JsonResource
             ...parent::toArray($request),
             'properties_count' => $this->whenCounted('properties'),
             'users' => UserResource::collection($this->whenLoaded('users')),
+            'listing' => ListingResource::make($this->whenLoaded('listing')),
         ];
 
         if ($isMediaLoaded) {
