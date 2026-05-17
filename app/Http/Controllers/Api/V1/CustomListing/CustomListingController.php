@@ -30,7 +30,7 @@ class CustomListingController extends Controller
         } catch (ApiException $e) {
             return $this->respond([
                 'message' => $e->getMessage(),
-            ]);
+            ], $e->getCode());
         }
 
         return CustomListingResource::make($newListing);

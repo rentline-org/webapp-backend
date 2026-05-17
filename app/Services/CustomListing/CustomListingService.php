@@ -37,11 +37,11 @@ class CustomListingService
     public function createCustomListing(Listing $listing, CustomListingDTO $customListingDTO): CustomListing
     {
         if ($listing->type !== ListingType::WEBSITE) {
-            throw new UnprocessableEntityHttpException("Invalid Listing type, make sure it's of type 'website'");
+            throw new ApiException(Response::HTTP_CONFLICT, ApiErrorCode::INVALID_INPUT->value, "Invalid listing type");
         }
 
         if ($listing->customListing->exists()) {
-            throw new ApiException(Response::HTTP_CONFLICT, ApiErrorCode::CONFLICT, 'Website listing already exists');
+            throw new ApiException(Response::HTTP_CONFLICT, ApiErrorCode::CONFLICT->value, 'Website listing already exists');
         }
 
         $basePayload = $customListingDTO->toArray();
