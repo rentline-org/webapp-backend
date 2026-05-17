@@ -22,13 +22,7 @@ class CustomListingCreateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'listing_id' => [
-                'required',
-                'integer',
-                'exists:listing,id',
 
-                Rule::unique('custom_listing', 'listing_id'),
-            ],
 
             'domain' => [
                 'required',
@@ -114,7 +108,6 @@ class CustomListingCreateRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'listing_id.unique' => 'This listing already has a website configured.',
             'domain.unique' => 'This domain is already in use.',
             'property_ids.*.exists' => 'One or more selected properties are invalid.',
         ];

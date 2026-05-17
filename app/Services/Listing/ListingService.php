@@ -5,7 +5,8 @@ namespace App\Services\Listing;
 use App\DTOs\Listing\ListingDTO;
 use App\Models\Listing;
 use App\Services\Organization\ActiveOrganizationContext;
-use DB;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class ListingService
 {
@@ -16,11 +17,12 @@ class ListingService
      */
     public function __construct() {}
 
-    public function getListing()
+    public function getListing(): ?Listing
     {
         return Listing::query()->with(['organization', 'custom_listing'])->firstOrFail();
     }
 
+    /** @throws Throwable */
     public function createListing(ListingDTO $listingDTO): Listing
     {
         $activeOrgId = app(ActiveOrganizationContext::class)->id();
@@ -36,6 +38,7 @@ class ListingService
         });
     }
 
+    /** @throws Throwable */
     public function updateListing(Listing $listing, ListingDTO $listingDTO): Listing
     {
         $activeOrgId = app(ActiveOrganizationContext::class)->id();

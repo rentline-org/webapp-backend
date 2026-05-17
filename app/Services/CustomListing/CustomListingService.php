@@ -3,12 +3,15 @@
 namespace App\Services\CustomListing;
 
 use App\DTOs\CustomListing\CustomListingDTO;
+use App\Enums\ApiErrorCode;
 use App\Enums\ListingType;
+use App\Exceptions\ApiException;
 use App\Models\CustomListing;
 use App\Models\Listing;
 use App\Repositories\Contracts\CustomListingRepositoryInterface;
 use App\Services\Organization\OrganizationService;
 use LogicException;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class CustomListingService
@@ -30,10 +33,15 @@ class CustomListingService
         return $this->customListingRepository->findByDomain($subdomain);
     }
 
+    /** @throws ApiException */
     public function createCustomListing(Listing $listing, CustomListingDTO $customListingDTO): CustomListing
     {
         if ($listing->type !== ListingType::WEBSITE) {
             throw new UnprocessableEntityHttpException("Invalid Listing type, make sure it's of type 'website'");
+        }
+
+        if ($listing->customListing->exists()) {
+            throw new ApiException(Response::HTTP_CONFLICT, ApiErrorCode::CONFLICT, 'Website listing already exists');
         }
 
         $basePayload = $customListingDTO->toArray();
@@ -61,9 +69,9 @@ class CustomListingService
         return $this->customListingRepository->update($customListing, $mutationPayload);
     }
 
-    public function updatePropertyList(CustomListing $customListing, array $propertyIds)
+    public function updatePropertyList(CustomListing $customListing, array $propertyIds): void
     {
-        return $this->customListingRepository->syncProperties($customListing, $propertyIds);
+        $this->customListingRepository->syncProperties($customListing, $propertyIds);
     }
 
     /**

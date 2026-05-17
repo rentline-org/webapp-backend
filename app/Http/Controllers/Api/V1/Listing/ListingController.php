@@ -10,6 +10,7 @@ use App\Http\Resources\Listing\ListingResource;
 use App\Models\Listing;
 use App\Services\Listing\ListingService;
 use Illuminate\Support\Facades\Gate;
+use Throwable;
 
 class ListingController extends Controller
 {
@@ -25,7 +26,9 @@ class ListingController extends Controller
         return ListingResource::make($listingData);
     }
 
-    /** Store a newly created resource in storage. */
+    /** Store a newly created resource in storage.
+     * @throws Throwable
+     */
     public function store(ListingCreateRequest $request)
     {
         Gate::authorize('create', Listing::class);
@@ -36,7 +39,9 @@ class ListingController extends Controller
         return ListingResource::make($listing);
     }
 
-    /** Update the specified resource in storage. */
+    /** Update the specified resource in storage.
+     * @throws Throwable
+     */
     public function update(ListingUpdateRequest $request, Listing $listing)
     {
         Gate::authorize('update', $listing);

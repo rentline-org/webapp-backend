@@ -4,63 +4,40 @@ namespace App\Policies;
 
 use App\Models\CustomListing;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class CustomListingPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
-    public function viewAny(User $user): bool
-    {
-        return false;
-    }
-
-    /**
-     * Determine whether the user can view the model.
-     */
+    /** Determine whether the user can view the model. */
     public function view(User $user, CustomListing $customListing): bool
     {
-        return false;
+        return $this->canManage($user);
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
+    public function viewPublished(CustomListing $customListing): bool
+    {
+        return $customListing->is_published;
+    }
+
+    /** Determine whether the user can create models. */
     public function create(User $user): bool
     {
-        return false;
+        return $this->canManage($user);
     }
 
-    /**
-     * Determine whether the user can update the model.
-     */
+    /** Determine whether the user can update the model. */
     public function update(User $user, CustomListing $customListing): bool
     {
-        return false;
+        return $this->canManage($user);
     }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
+    /** Determine whether the user can delete the model. */
     public function delete(User $user, CustomListing $customListing): bool
     {
-        return false;
+        return $this->canManage($user) || ! $customListing->is_published;
     }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
-    public function restore(User $user, CustomListing $customListing): bool
+    private function canManage(User $user): bool
     {
-        return false;
-    }
-
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
-    public function forceDelete(User $user, CustomListing $customListing): bool
-    {
-        return false;
+        return $user->isLandlord() || $user->isSuperAdmin();
     }
 }
