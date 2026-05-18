@@ -13,9 +13,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('organization_id')->constrained()->cascadeOnDelete();
 
-            $table->enum('type', collect(ListingType::cases())->map->value->all());
-
-            $table->unique(['organization_id', 'type']);
             $table->timestamps();
         });
     }

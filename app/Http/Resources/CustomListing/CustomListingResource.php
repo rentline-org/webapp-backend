@@ -34,7 +34,7 @@ class CustomListingResource extends JsonResource
             'contact_phone' => $this->contact_phone,
 
             'languages' => $this->languages,
-
+            'properties_count' => $this->whenCounted('properties'),
             'properties' => PropertyResource::collection(
                 $this->whenLoaded('properties')
             ),

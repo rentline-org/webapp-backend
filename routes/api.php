@@ -28,3 +28,4 @@ include 'api/v1/DataProcessingJobRoutes.php';
 include 'api/v1/OrganizationRoutes.php';
 include 'api/v1/PropertyRoutes.php';
 include 'api/v1/UnitRoutes.php';
+include 'api/v1/ListingRoutes.php';

@@ -23,11 +23,6 @@ class Listing extends Model
 {
     protected $fillable = [
         'organization_id',
-        'type',
-    ];
-
-    protected $casts = [
-        'type' => ListingType::class,
     ];
 
     public function organization(): BelongsTo
@@ -40,7 +35,7 @@ class Listing extends Model
         return $this->hasOne(CustomListing::class);
     }
 
-    protected static function boot()
+    protected static function booted(): void
     {
         static::addGlobalScope(new OrganizationScope);
     }

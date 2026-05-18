@@ -9,7 +9,9 @@ use App\Http\Requests\Listing\ListingUpdateRequest;
 use App\Http\Resources\Listing\ListingResource;
 use App\Models\Listing;
 use App\Services\Listing\ListingService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 class ListingController extends Controller
@@ -23,18 +25,21 @@ class ListingController extends Controller
 
         $listingData = $this->listingService->getListing();
 
+        if ($listingData === null) {
+            return $this->respond(null, Response::HTTP_NOT_FOUND);
+        }
+
         return ListingResource::make($listingData);
     }
 
     /** Store a newly created resource in storage.
      * @throws Throwable
      */
-    public function store(ListingCreateRequest $request)
+    public function store(Request $request)
     {
         Gate::authorize('create', Listing::class);
-        $validated = $request->validated();
 
-        $listing = $this->listingService->createListing(ListingDTO::fromRequest($validated));
+        $listing = $this->listingService->createListing();
 
         return ListingResource::make($listing);
     }

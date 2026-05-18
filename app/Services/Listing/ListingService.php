@@ -19,15 +19,14 @@ class ListingService
 
     public function getListing(): ?Listing
     {
-        return Listing::query()->with(['organization', 'custom_listing'])->firstOrFail();
+        return Listing::query()->with(['customListing'])->first();
     }
 
     /** @throws Throwable */
-    public function createListing(ListingDTO $listingDTO): Listing
+    public function createListing(): Listing
     {
         $activeOrgId = app(ActiveOrganizationContext::class)->id();
         $data = [
-            ...$listingDTO->toArray(),
             'organization_id' => $activeOrgId,
         ];
 

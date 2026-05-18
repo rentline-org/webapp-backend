@@ -22,8 +22,6 @@ class CustomListingCreateRequest extends FormRequest
     public function rules(): array
     {
         return [
-
-
             'domain' => [
                 'required',
                 'string',

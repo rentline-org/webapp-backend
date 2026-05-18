@@ -148,7 +148,7 @@ class Organization extends Model implements HasMedia
         return $this->hasMany(Property::class);
     }
 
-    public function listings(): HasOne
+    public function listing(): HasOne
     {
         return $this->hasOne(Listing::class);
     }

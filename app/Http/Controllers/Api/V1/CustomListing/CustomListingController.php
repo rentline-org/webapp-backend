@@ -39,7 +39,7 @@ class CustomListingController extends Controller
     public function showPublic(string $subdomain)
     {
         Gate::authorize('view-published', CustomListing::class);
-        $listing = $this->customListingService->getCustomListing($subdomain);
+        $listing = $this->customListingService->getPublicListingByDomain($subdomain);
 
         return CustomListingResource::make($listing);
     }
@@ -48,7 +48,7 @@ class CustomListingController extends Controller
     public function show(CustomListing $customListing)
     {
         Gate::authorize('view', $customListing);
-        $customListing->load(['listing']);
+        $customListing->load(['listing', 'properties'])->withCount('properties');
 
         return CustomListingResource::make($customListing);
     }
