@@ -9,7 +9,7 @@ class CustomListingDTO
 {
     public function __construct(
         public ?int $listing_id,
-        public string $domain,
+        public string $subdomain,
         public ?string $headline,
 
         public bool $is_published,
@@ -33,7 +33,7 @@ class CustomListingDTO
         return new self(
             listing_id: $existing?->listing_id ?? $request->input('listing_id'),
 
-            domain: $request->input('domain', $existing?->domain),
+            subdomain: $request->input('subdomain', $existing?->subdomain),
 
             headline: $request->input(
                 'headline',
@@ -88,7 +88,7 @@ class CustomListingDTO
     {
         return [
             'listing_id' => $this->listing_id,
-            'domain' => $this->domain,
+            'subdomain' => $this->subdomain,
             'headline' => $this->headline,
 
             'is_published' => $this->is_published,

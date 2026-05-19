@@ -52,7 +52,7 @@ class CustomListingRepository implements CustomListingRepositoryInterface
             /** @var CustomListing $customListing */
             $customListing = $listing->customListing()->create($data);
 
-            return $customListing->fresh(['listing']) ?? $customListing;
+            return $customListing->fresh() ?? $customListing;
         });
     }
 

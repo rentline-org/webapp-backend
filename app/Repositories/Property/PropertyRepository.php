@@ -15,8 +15,8 @@ class PropertyRepository implements PropertyRepositoryInterface
 {
     public function all(array $filters = []): Collection
     {
-        return $this->query($filters)
-            ->with(['units'])
+        return Property::query()
+            ->with(['units', 'media'])
             ->withCount('units')
             ->get();
     }

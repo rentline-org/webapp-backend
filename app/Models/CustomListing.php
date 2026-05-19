@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class CustomListing extends Model
 {
+    protected $table = 'custom_listings';
+
     protected $fillable = [
         'listing_id',
         'subdomain',

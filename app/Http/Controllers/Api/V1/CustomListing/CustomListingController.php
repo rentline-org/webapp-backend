@@ -23,10 +23,10 @@ class CustomListingController extends Controller
     public function store(Listing $listing, CustomListingCreateRequest $request)
     {
         Gate::authorize('create', CustomListing::class);
-        $validated = $request->validated();
+        $request->validated();
 
         try {
-            $newListing = $this->customListingService->createCustomListing($listing, CustomListingDTO::fromRequest($validated));
+            $newListing = $this->customListingService->createCustomListing($listing, CustomListingDTO::fromRequest($request));
         } catch (ApiException $e) {
             return $this->respond([
                 'message' => $e->getMessage(),
@@ -48,7 +48,7 @@ class CustomListingController extends Controller
     public function show(CustomListing $customListing)
     {
         Gate::authorize('view', $customListing);
-        $customListing->load(['listing', 'properties'])->withCount('properties');
+        $customListing->load(['properties.units'])->loadCount('properties');
 
         return CustomListingResource::make($customListing);
     }
@@ -73,6 +73,7 @@ class CustomListingController extends Controller
         $this->customListingService->updatePropertyList($customListing, $propertyIds);
 
         $freshListing = $customListing->refresh();
+
         return CustomListingResource::make($freshListing);
     }
 
@@ -85,11 +86,24 @@ class CustomListingController extends Controller
     }
 
     /** Just set the website listing as drafted. */
-    public function destroy(CustomListing $customListing)
+    public function draft(CustomListing $customListing)
     {
         Gate::authorize('delete', $customListing);
         $this->customListingService->draft($customListing);
 
         return $this->respond(null, Response::HTTP_NO_CONTENT);
+    }
+
+    public function destroy(CustomListing $customListing)
+    {
+        Gate::authorize('delete', $customListing);
+
+        if ($this->customListingService->deleteCustomListing($customListing)) {
+            return $this->respond(null, Response::HTTP_NO_CONTENT);
+        }
+
+        return $this->respond([
+            'message' => 'Failed to delete listing',
+        ], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 }

@@ -19,7 +19,7 @@ class CustomListingResource extends JsonResource
             'id' => $this->id,
             'listing_id' => $this->listing_id,
 
-            'domain' => $this->domain,
+            'subdomain' => $this->subdomain,
             'headline' => $this->headline,
 
             'is_published' => $this->is_published,

@@ -22,18 +22,17 @@ class CustomListingCreateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'domain' => [
+            'subdomain' => [
                 'required',
                 'string',
                 'min:3',
                 'max:255',
                 'alpha_dash',
 
-                Rule::unique('custom_listing', 'domain'),
+                Rule::unique('custom_listings', 'subdomain'),
             ],
 
             'headline' => [
-                'nullable',
                 'string',
                 'max:255',
             ],
@@ -97,6 +96,7 @@ class CustomListingCreateRequest extends FormRequest
             ],
         ];
     }
+
 
     /**
      * Get custom validation messages.

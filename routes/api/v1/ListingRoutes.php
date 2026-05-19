@@ -14,6 +14,7 @@ Route::group(['prefix' => 'v1', 'middleware' => ['auth:sanctum']], function () {
     Route::patch('/custom-listing/{customListing}', [CustomListingController::class, 'update']);
     Route::patch('/custom-listing/{customListing}/properties', [CustomListingController::class, 'updateProperties']);
     Route::patch('/custom-listing/{customListing}/publish', [CustomListingController::class, 'publish']);
+    Route::patch('/custom-listing/{customListing}/draft', [CustomListingController::class, 'publish']);
     Route::delete('/custom-listing/{customListing}', [CustomListingController::class, 'destroy']);
 });
 

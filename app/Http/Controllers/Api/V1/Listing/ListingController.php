@@ -26,7 +26,7 @@ class ListingController extends Controller
         $listingData = $this->listingService->getListing();
 
         if ($listingData === null) {
-            return $this->respond(null, Response::HTTP_NOT_FOUND);
+            return $this->respond(null);
         }
 
         return ListingResource::make($listingData);
