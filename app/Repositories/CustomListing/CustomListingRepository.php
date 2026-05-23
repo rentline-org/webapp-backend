@@ -14,28 +14,27 @@ use Throwable;
  */
 class CustomListingRepository implements CustomListingRepositoryInterface
 {
-    /** Find a custom listing by its domain. */
-    public function findByDomain(string $subdomain, bool $publishedOnly = false): ?CustomListing
+    public function findPublishedByDomain(string $subdomain): CustomListing
     {
-        $relations = [
-            'listing',
-            'properties',
-        ];
-
-        $query = CustomListing::query();
-
-        if ($publishedOnly) {
-            $relations = [
-                ...$relations,
+        return CustomListing::query()
+            ->where('subdomain', $subdomain)
+            ->where('is_published', true)
+            ->with([
                 'listing.organization',
                 'properties.units',
-            ];
+                'properties.media',
+                'properties.units.media',
+                'listing.organization.media',
+            ])
+            ->firstOrFail();
+    }
 
-            $query->where('is_published', true);
-        }
-
-        return $query->with($relations)
+    /** Find a custom listing by its domain. */
+    public function findByDomain(string $subdomain): CustomListing
+    {
+        return CustomListing::query()
             ->where('subdomain', $subdomain)
+            ->withCount('properties')
             ->firstOrFail();
     }
 

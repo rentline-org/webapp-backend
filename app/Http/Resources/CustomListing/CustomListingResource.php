@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\CustomListing;
 
+use App\Http\Resources\Listing\ListingResource;
 use App\Http\Resources\Property\PropertyResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -38,7 +39,7 @@ class CustomListingResource extends JsonResource
             'properties' => PropertyResource::collection(
                 $this->whenLoaded('properties')
             ),
-
+            'listing' => ListingResource::make($this->whenLoaded('listing')),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

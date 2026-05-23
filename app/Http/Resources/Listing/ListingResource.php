@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Listing;
 
 use App\Http\Resources\CustomListing\CustomListingResource;
+use App\Http\Resources\Organization\OrganizationResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,6 +24,7 @@ class ListingResource extends JsonResource
             'custom_listing' => CustomListingResource::make(
                 $this->whenLoaded('customListing')
             ),
+            'organization' => OrganizationResource::make($this->whenLoaded('organization')),
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

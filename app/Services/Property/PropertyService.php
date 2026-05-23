@@ -4,19 +4,21 @@ namespace App\Services\Property;
 
 use App\DTOs\Property\PropertyDTO;
 use App\DTOs\Unit\UnitDTO;
+use App\Events\PropertyCreated;
 use App\Models\Property;
 use App\Repositories\Contracts\PropertyRepositoryInterface;
 use App\Repositories\Contracts\UnitRepositoryInterface;
 use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
 use RuntimeException;
 
 class PropertyService
 {
     public function __construct(
         protected PropertyRepositoryInterface $propertyRepository,
-        protected UnitRepositoryInterface $unitRepository
+        protected UnitRepositoryInterface $unitRepository,
     ) {
         //
     }
@@ -64,6 +66,7 @@ class PropertyService
     public function create(PropertyDTO $dto, array $units): Property
     {
         $organizationId = app(ActiveOrganizationContext::class)->id();
+        $user = auth()->user();
 
         if (! $organizationId) {
             throw new RuntimeException('No active organization context found.');
@@ -84,6 +87,8 @@ class PropertyService
         }
 
         $createdProperty->load(['units']);
+
+        event(new PropertyCreated($user, $createdProperty));
 
         return $createdProperty;
     }

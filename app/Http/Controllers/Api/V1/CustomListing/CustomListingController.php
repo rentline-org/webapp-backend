@@ -38,7 +38,6 @@ class CustomListingController extends Controller
 
     public function showPublic(string $subdomain)
     {
-        Gate::authorize('view-published', CustomListing::class);
         $listing = $this->customListingService->getPublicListingByDomain($subdomain);
 
         return CustomListingResource::make($listing);

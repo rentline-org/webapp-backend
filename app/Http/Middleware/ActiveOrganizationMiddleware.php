@@ -21,18 +21,10 @@ class ActiveOrganizationMiddleware
             return $next($request);
         }
 
-        /**
-         * Priority:
-         * 1. X-Organization-Id header
-         * 2. Sanctum token organization_id
-         */
         $headerOrgId = $request->header('X-Organization-Id');
 
         $activeOrgId = $headerOrgId;
 
-        /**
-         * Validate organization access
-         */
         if (
             $activeOrgId &&
             ! $user->organizations()->whereKey($activeOrgId)->exists()
@@ -40,7 +32,6 @@ class ActiveOrganizationMiddleware
             abort(403, 'Invalid organization for this user.');
         }
 
-        // app(ActiveOrganizationContext::class)->set($activeOrgId);
         $request->attributes->set('active_org_id', $activeOrgId);
 
         return $next($request);

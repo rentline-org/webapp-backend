@@ -6,4 +6,5 @@ enum DataProcessingJobType: string
 {
     case IMPORT = 'import';
     case EXPORT = 'export';
+    case GEOCODING = 'geocoding';
 }

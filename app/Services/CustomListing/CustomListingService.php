@@ -23,7 +23,7 @@ class CustomListingService
 
     public function getPublicListingByDomain(string $subdomain): CustomListing
     {
-        return $this->customListingRepository->findByDomain($subdomain, true);
+        return $this->customListingRepository->findPublishedByDomain($subdomain);
     }
 
     public function getCustomListing(string $subdomain): CustomListing

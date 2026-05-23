@@ -7,7 +7,8 @@ use App\Models\Listing;
 
 interface CustomListingRepositoryInterface
 {
-    public function findByDomain(string $subdomain, bool $publishedOnly = false): ?CustomListing;
+    public function findByDomain(string $subdomain): ?CustomListing;
+    public function findPublishedByDomain(string $subdomain): CustomListing;
 
     public function create(Listing $listing, array $data): CustomListing;
 

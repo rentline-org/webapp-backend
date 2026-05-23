@@ -10,36 +10,39 @@ use App\Models\Scopes\OrganizationScope;
 use App\Traits\HasGallery;
 use App\Traits\HasSlug;
 use App\Traits\HasThumbnail;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
- * @property int $id
- * @property int $organization_id
- * @property string $slug
- * @property string $title
- * @property string|null $description
- * @property string $address
- * @property string $city
- * @property string $state
- * @property string $postal_code
- * @property string|null $country
+ * @property int          $id
+ * @property int          $organization_id
+ * @property string       $slug
+ * @property string       $title
+ * @property string|null  $description
+ * @property string       $address
+ * @property string       $city
+ * @property string       $state
+ * @property string       $postal_code
+ * @property string|null  $country
  * @property PropertyType $property_type
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Contact> $contacts
+ * @property Carbon|null  $created_at
+ * @property Carbon|null  $updated_at
+ * @property-read Collection<int, Contact> $contacts
  * @property-read int|null $contacts_count
- * @property-read \App\Models\CustomListing|null $customListing
- * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, \App\Models\Media> $media
+ * @property-read CustomListing|null $customListing
+ * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, Media> $media
  * @property-read int|null $media_count
- * @property-read \App\Models\Organization|null $organization
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Unit> $units
+ * @property-read Organization|null $organization
+ * @property-read Collection<int, Unit> $units
  * @property-read int|null $units_count
- * @method static \Database\Factories\PropertyFactory factory($count = null, $state = [])
+ *
+ * @method static \Database\Factories\PropertyFactory                    factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Property newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Property newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Property query()
@@ -56,6 +59,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Property whereState($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Property whereTitle($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Property whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class Property extends Model implements HasMedia
@@ -77,6 +81,11 @@ class Property extends Model implements HasMedia
         'postal_code',
         'country',
         'property_type',
+        'longitude',
+        'latitude',
+        'full_address',
+        'address_number',
+        'region_code',
     ];
 
     protected $casts = [
