@@ -116,6 +116,11 @@ class Organization extends Model implements HasMedia
         'is_active',
         'settings',
         'trial_ends_at',
+        'longitude',
+        'latitude',
+        'full_address',
+        'address_number',
+        'region_code',
     ];
 
     protected $casts = [

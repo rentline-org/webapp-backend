@@ -57,16 +57,14 @@ class GeocodingService
         return [
             'latitude' => $feature['geometry']['coordinates'][1] ?? null,
             'longitude' => $feature['geometry']['coordinates'][0] ?? null,
-            'properties' => [
-                'full_address' => $properties['full_address'] ?? null,
-                'address_number' => $properties['context']['address']['address_number'] ?? null,
-                'address' => $properties['context']['address']['street_name'] ?? null,
-                'postal_code' => $properties['context']['postcode']['name'] ?? null,
-                'city' => $properties['context']['place']['name'] ?? null,
-                'state' => $properties['context']['region']['name'] ?? null,
-                'region_code' => $properties['context']['region']['region_code'] ?? null,
-            ],
-            'raw' => $feature,
+            'full_address' => $properties['full_address'] ?? null,
+            'address_number' => $properties['context']['address']['address_number'] ?? null,
+            'address' => $properties['context']['address']['street_name'] ?? null,
+            'address_line' => $properties['context']['address']['name'] ?? null,
+            'postal_code' => $properties['context']['postcode']['name'] ?? null,
+            'city' => $properties['context']['place']['name'] ?? null,
+            'state' => $properties['context']['region']['name'] ?? null,
+            'region_code' => $properties['context']['region']['region_code'] ?? null,
         ];
     }
 }

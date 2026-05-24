@@ -41,6 +41,11 @@ class PropertyResource extends JsonResource
             'thumbnail' => $this->thumbnail(),
             'gallery_urls' => $this->gallery(),
             'media' => $this->whenLoaded('media'),
+            'longitude' => $this->longitude,
+            'latitude' => $this->latitude,
+            'full_address' => $this->full_address,
+            'region_code' => $this->region_code,
+            'address_number' => $this->address_number,
 
             'organization' => OrganizationResource::make(
                 $this->whenLoaded('organization')

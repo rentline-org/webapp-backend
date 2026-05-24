@@ -34,12 +34,15 @@ class OrganizationRepository implements OrganizationRepositoryInterface
         });
     }
 
-    /** {@inheritDoc} */
+    /** {}
+     * @throws \Throwable
+     */
     public function create(array $data): Organization
     {
-        return DB::transaction(fn () => Organization::create($data));
+        return DB::transaction(fn () => Organization::query()->create($data));
     }
 
+    /** @throws \Throwable */
     public function delete(Organization $organization): bool
     {
         /** @var Model $organization */
@@ -55,11 +58,9 @@ class OrganizationRepository implements OrganizationRepositoryInterface
     /** {@inheritDoc} */
     public function findById(int $id): Organization
     {
-        $organization = Organization::query()
+        return Organization::query()
             ->with(['users', 'contacts', 'media'])
             ->findOrFail($id);
-
-        return $organization;
     }
 
     /**
@@ -74,7 +75,7 @@ class OrganizationRepository implements OrganizationRepositoryInterface
     /** {@inheritDoc} */
     public function getAllUserOrganizations(int $userId): array
     {
-        $user = User::findOrFail($userId);
+        $user = User::query()->findOrFail($userId);
 
         return $user->organizations()
             ->withCount('properties')
@@ -82,7 +83,9 @@ class OrganizationRepository implements OrganizationRepositoryInterface
             ->all();
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     * @throws \Throwable
+     */
     public function getOrganizationUsers(int $organizationId): array
     {
         return DB::transaction(function () use ($organizationId) {
@@ -92,7 +95,9 @@ class OrganizationRepository implements OrganizationRepositoryInterface
         });
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     * @throws \Throwable
+     */
     public function removeUserFromOrganization(int $userId, int $organizationId): void
     {
         DB::transaction(function () use ($userId, $organizationId) {
@@ -112,7 +117,9 @@ class OrganizationRepository implements OrganizationRepositoryInterface
         });
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritDoc}
+     * @throws \Throwable
+     */
     public function updateOrganizationAvatar(Organization $organization, $avatar): Organization
     {
         return DB::transaction(function () use ($organization, $avatar) {

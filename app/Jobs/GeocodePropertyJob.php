@@ -42,17 +42,18 @@ class GeocodePropertyJob implements ShouldQueue
             ]);
 
             $property->update([
-                'longitude' => $geolocation['longitude'],
                 'latitude' => $geolocation['latitude'],
-                'full_address' => $geolocation['properties']['full_address'],
-                'address_number' => $geolocation['properties']['address_number'],
-                'address' => $geolocation['properties']['address'],
-                'postal_code' => $geolocation['properties']['postal_code'],
-                'city' => $geolocation['properties']['city'],
-                'state' => $geolocation['properties']['state'],
-                'region_code' => $geolocation['properties']['region_code'],
+                'longitude' => $geolocation['longitude'],
+                'address' => $geolocation['address'],
+                'city' => $geolocation['city'],
+                'state' => $geolocation['state'],
+                'postal_code' => $geolocation['postal_code'],
+                'full_address' => $geolocation['full_address'],
+                'address_number' => $geolocation['address_number'],
+                'region_code' => $geolocation['region_code'],
             ]);
 
+//            $dataProcessingJobService->updateJobStatus($trackingJob);
             $dataProcessingJobService->updateJobResults($trackingJob, 1, 1, 0);
         } catch (\Throwable $exception) {
             $dataProcessingJobService->updateJobError($trackingJob, $exception->getMessage());

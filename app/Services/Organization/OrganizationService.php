@@ -4,6 +4,7 @@ namespace App\Services\Organization;
 
 use App\DTOs\Organization\OrganizationDTO;
 use App\Enums\MediaCollection;
+use App\Events\OrganizationCreated;
 use App\Models\Organization;
 use App\Models\User;
 use App\Repositories\Contracts\OrganizationRepositoryInterface;
@@ -59,6 +60,7 @@ class OrganizationService
             $this->organizationRepository->assignUserToOrganization($user->id, $organization->id);
         }
 
+        event(new OrganizationCreated($user, $organization));
         return $organization;
     }
 
