@@ -11,6 +11,11 @@ use App\Models\Media;
 use App\Models\Property;
 use App\Services\Media\GalleryService;
 
+/**
+ * @group Property Gallery Management
+ * 
+ */
+
 class PropertyGalleryController extends Controller
 {
     private string $wrongPropertyTypeMessage = 'Invalid property. Must be multi-unit to have an establishment thumbnail';

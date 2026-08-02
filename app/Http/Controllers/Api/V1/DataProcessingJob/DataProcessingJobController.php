@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DataProcessing\DataProcessingJobResource;
 use App\Services\DataProcessingJob\DataProcessingJobService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -62,7 +63,7 @@ class DataProcessingJobController extends Controller
      */
     public function getUserJobs(Request $request)
     {
-        $userId = auth()->id();
+        $userId = Auth::id(); 
         $jobs = $this->dataProcessingJobService->getUserJobs($userId);
 
         return DataProcessingJobResource::collection($jobs);

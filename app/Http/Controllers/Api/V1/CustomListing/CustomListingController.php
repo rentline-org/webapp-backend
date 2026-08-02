@@ -15,6 +15,12 @@ use App\Services\CustomListing\CustomListingService;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
+
+/*
+@group Custom Listing Management
+APIs for managing custom listings
+
+*/
 class CustomListingController extends Controller
 {
     public function __construct(protected CustomListingService $customListingService) {}

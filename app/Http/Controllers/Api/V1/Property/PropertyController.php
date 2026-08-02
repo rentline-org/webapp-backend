@@ -13,6 +13,11 @@ use App\Services\Property\PropertyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * @group Property Management
+ * Main APIs for managing properties
+ */
+
 class PropertyController extends Controller
 {
     public function __construct(

@@ -13,6 +13,10 @@ use App\Services\Unit\UnitService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * @group Unit Management
+ * APIs for managing units
+ */
 class UnitController extends Controller
 {
     public function __construct(

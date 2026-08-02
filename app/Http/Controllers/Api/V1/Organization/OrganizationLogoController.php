@@ -12,6 +12,10 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 
+/**
+ * @group Organization Logo Management
+ * APIs for managing organization logos
+ */
 class OrganizationLogoController extends Controller
 {
     public function __construct(

@@ -14,6 +14,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * @group Organization Management
+ * APIs for managing organizations
+ */
 class OrganizationController extends Controller
 {
     public function __construct(

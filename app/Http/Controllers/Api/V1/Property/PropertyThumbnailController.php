@@ -10,6 +10,11 @@ use App\Models\Property;
 use App\Services\Media\ThumbnailService;
 use Symfony\Component\HttpFoundation\Response;
 
+
+/**
+ * @group Property Thumbnail Management
+ * APIs for managing property thumbnails
+ */
 class PropertyThumbnailController extends Controller
 {
     private string $wrongPropertyTypeMessage = 'Invalid property. Must be multi-unit to have an establishment thumbnail';

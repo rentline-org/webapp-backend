@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
 <head>
-    <title>IMS_Laravel_API_Starter API Documentation</title>
+    <title>Rentline API Documentation</title>
     <meta charset="utf-8"/>
     <meta
         name="viewport"

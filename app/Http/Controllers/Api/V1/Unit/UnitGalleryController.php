@@ -13,6 +13,10 @@ use App\Services\Media\GalleryService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * @group Unit Gallery Management
+ * APIs for managing unit galleries
+ */
 class UnitGalleryController extends Controller
 {
     public function __construct(protected GalleryService $galleryService) {}

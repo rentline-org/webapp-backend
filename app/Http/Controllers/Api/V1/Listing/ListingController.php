@@ -11,9 +11,13 @@ use App\Models\Listing;
 use App\Services\Listing\ListingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
+
+/**
+ * @group Listing Management
+ * APIs for managing listings
+ */
 class ListingController extends Controller
 {
     public function __construct(protected ListingService $listingService) {}

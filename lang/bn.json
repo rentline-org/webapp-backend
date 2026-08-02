@@ -110,6 +110,7 @@
     "Invalid filename.": "অবৈধ ফাইলনাম।",
     "Invalid JSON was returned from the route.": "রাউট থেকে অবৈধ JSON এসেছে।",
     "Invalid SSL Certificate": "অবৈধ SSL শংসাপত্র",
+    "length": "দৈর্ঘ্য",
     "Length Required": "দৈর্ঘ্য প্রয়োজন",
     "Like": "লাইক",
     "Load": "বোঝা",

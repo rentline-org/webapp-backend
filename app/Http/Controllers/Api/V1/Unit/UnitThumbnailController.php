@@ -10,6 +10,10 @@ use App\Models\Unit;
 use App\Services\Media\ThumbnailService;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * @group Unit Thumbnail Management
+ * APIs for managing unit thumbnails
+ */
 class UnitThumbnailController extends Controller
 {
     public function __construct(protected ThumbnailService $thumbnailService) {}
