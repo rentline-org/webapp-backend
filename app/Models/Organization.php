@@ -148,6 +148,11 @@ class Organization extends Model implements HasMedia
         return $this->hasMany(Contact::class);
     }
 
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
+
     public function properties(): HasMany
     {
         return $this->hasMany(Property::class);

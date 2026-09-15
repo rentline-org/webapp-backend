@@ -9,6 +9,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -152,6 +153,16 @@ class User extends Authenticatable implements HasMedia
     public function organizations()
     {
         return $this->belongsToMany(Organization::class)->withTimestamps();
+    }
+
+    public function uploadedDocuments(): HasMany
+    {
+        return $this->hasMany(Document::class, 'uploaded_by');
+    }
+
+    public function signedDocuments(): HasMany
+    {
+        return $this->hasMany(Document::class, 'signed_by');
     }
 
     /**

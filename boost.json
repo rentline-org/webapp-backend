@@ -1,0 +1,25 @@
+{
+    "agents": [
+        "antigravity",
+        "codex",
+        "zed",
+        "claude_code",
+        "cursor",
+        "copilot"
+    ],
+    "cloud": false,
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch": false,
+    "packages": [
+        "spatie/laravel-medialibrary"
+    ],
+    "sail": false,
+    "skills": [
+        "infer-conventions",
+        "laravel-best-practices",
+        "testing-best-practices",
+        "pulse-development",
+        "medialibrary-development"
+    ]
+}

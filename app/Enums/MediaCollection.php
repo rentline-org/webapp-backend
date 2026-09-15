@@ -12,4 +12,7 @@ enum MediaCollection: string
 
     case UNIT_THUMB = 'unit_thumbnail';
     case UNIT_GALLERY = 'unit_gallery';
+
+    case DOCUMENT_ORIGINAL = 'document_original';
+    case DOCUMENT_SIGNED = 'document_signed';
 }

@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Repositories\Contact\ContactRepository;
+use App\Repositories\Contracts\ContactRepositoryInterface;
 use App\Repositories\Contracts\CustomListingRepositoryInterface;
 use App\Repositories\Contracts\DataProcessingJobRepositoryInterface;
+use App\Repositories\Contracts\DocumentRepositoryInterface;
 use App\Repositories\Contracts\OrganizationRepositoryInterface;
 use App\Repositories\Contracts\PropertyRepositoryInterface;
 use App\Repositories\Contracts\RoleRepositoryInterface;
@@ -11,6 +14,7 @@ use App\Repositories\Contracts\UnitRepositoryInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Repositories\CustomListing\CustomListingRepository;
 use App\Repositories\DataProcessingJob\DataProcessingJobRepository;
+use App\Repositories\Document\DocumentRepository;
 use App\Repositories\Organization\OrganizationRepository;
 use App\Repositories\Property\PropertyRepository;
 use App\Repositories\Role\RoleRepository;
@@ -23,6 +27,8 @@ class RepositoryServiceProvider extends ServiceProvider
     /** Register services. */
     public function register(): void
     {
+        $this->app->bind(DocumentRepositoryInterface::class, DocumentRepository::class);
+        $this->app->bind(ContactRepositoryInterface::class, ContactRepository::class);
         $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
         $this->app->bind(RoleRepositoryInterface::class, RoleRepository::class);
         $this->app->bind(DataProcessingJobRepositoryInterface::class, DataProcessingJobRepository::class);

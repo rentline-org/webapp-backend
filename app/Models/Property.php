@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Spatie\MediaLibrary\HasMedia;
@@ -107,9 +108,14 @@ class Property extends Model implements HasMedia
         return $this->belongsTo(CustomListing::class);
     }
 
-    public function contacts()
+    public function contacts(): BelongsToMany
     {
-        return $this->hasMany(Contact::class);
+        return $this->belongsToMany(Contact::class)->withTimestamps();
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
     }
 
     /** Always at least 1 unit */
