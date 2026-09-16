@@ -15,8 +15,8 @@ class PropertyRepository implements PropertyRepositoryInterface
 {
     public function all(array $filters = []): Collection
     {
-        return Property::query()
-            ->with(['units', 'media'])
+        return $this->query($filters)
+            ->with(['units.leases', 'media'])
             ->withCount('units')
             ->get();
     }
@@ -40,7 +40,7 @@ class PropertyRepository implements PropertyRepositoryInterface
 
     public function findById(int $id): ?Property
     {
-        return Property::with(['units', 'organization'])
+        return Property::with(['units.leases', 'organization', 'contactAssignments.contact'])
             ->withCount('units')
             ->find($id);
     }
@@ -54,7 +54,7 @@ class PropertyRepository implements PropertyRepositoryInterface
         }
 
         return $property
-            ->load(['units', 'organization'])
+            ->load(['units.leases', 'organization', 'contactAssignments.contact'])
             ->loadCount('units');
     }
 
@@ -80,6 +80,10 @@ class PropertyRepository implements PropertyRepositoryInterface
     {
         $query = Property::query();
 
+        if (empty($filters['include_archived'])) {
+            $query->whereNull('archived_at');
+        }
+
         if (! empty($filters['with_units'])) {
             $query->with('units');
         }
@@ -89,7 +93,15 @@ class PropertyRepository implements PropertyRepositoryInterface
         }
 
         if (array_key_exists('is_available', $filters) && $filters['is_available'] !== null) {
-            $query->where('is_available', (bool) $filters['is_available']);
+            $available = filter_var($filters['is_available'], FILTER_VALIDATE_BOOL);
+            $method = $available ? 'whereHas' : 'whereDoesntHave';
+            $query->{$method}('units', function (Builder $query): void {
+                $query->whereNull('archived_at')
+                    ->where('operational_status', 'active')
+                    ->whereDoesntHave('leases', fn (Builder $leaseQuery) => $leaseQuery
+                        ->where('workflow_status', 'active')
+                        ->whereDate('ends_on', '>=', today()));
+            });
         }
 
         if (! empty($filters['city'])) {

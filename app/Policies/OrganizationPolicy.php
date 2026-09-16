@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\OrganizationMemberRole;
 use App\Models\Organization;
 use App\Models\User;
 
@@ -9,7 +10,7 @@ class OrganizationPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isSuperAdmin() || $user->isLandlord();
+        return $user->isSuperAdmin() || $user->organizations()->exists();
     }
 
     public function view(User $user, Organization $organization): bool
@@ -29,7 +30,10 @@ class OrganizationPolicy
 
     public function delete(User $user, Organization $organization): bool
     {
-        return $user->isSuperAdmin() || $this->canManageOrganization($user, $organization);
+        return $user->isSuperAdmin() || $user->hasActiveOrganizationRole([
+            OrganizationMemberRole::OWNER,
+            OrganizationMemberRole::ADMIN,
+        ], $organization->id);
     }
 
     public function restore(User $user, Organization $organization): bool
@@ -48,8 +52,7 @@ class OrganizationPolicy
             return true;
         }
 
-        return (int) $organization->owner_id === (int) $user->id
-            || $organization->users()->whereKey($user->id)->exists();
+        return $user->membershipRole($organization->id) !== null;
     }
 
     private function canManageOrganization(User $user, Organization $organization): bool
@@ -58,11 +61,6 @@ class OrganizationPolicy
             return true;
         }
 
-        if (! $user->isLandlord()) {
-            return false;
-        }
-
-        return (int) $organization->owner_id === (int) $user->id
-            || $organization->users()->whereKey($user->id)->exists();
+        return $user->canManageActiveOrganization($organization->id);
     }
 }

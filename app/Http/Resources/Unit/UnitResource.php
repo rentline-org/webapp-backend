@@ -22,7 +22,10 @@ class UnitResource extends JsonResource
             'slug' => $this->slug,
             'description' => $this->description,
             'unit_type' => $this->unit_type,
-            'is_available' => $this->is_available,
+            'operational_status' => $this->operational_status?->value ?? $this->operational_status,
+            'occupancy_status' => $this->occupancyStatus()->value,
+            'is_available' => $this->isOperationallyAvailable(),
+            'archived_at' => $this->archived_at,
             'is_furnished' => $this->is_furnished,
             'rent_price' => $this->rent_price,
             'sale_price' => $this->sale_price,
@@ -39,6 +42,13 @@ class UnitResource extends JsonResource
             'property' => PropertyResource::make(
                 $this->whenLoaded('property')
             ),
+            'contact_assignments' => $this->whenLoaded('contactAssignments', fn () => $this->contactAssignments->map(fn ($assignment) => [
+                'id' => $assignment->id,
+                'contact_id' => $assignment->contact_id,
+                'role' => $assignment->role?->value ?? $assignment->role,
+                'source' => $assignment->source?->value ?? $assignment->source,
+                'name' => $assignment->contact?->name,
+            ])->values()),
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

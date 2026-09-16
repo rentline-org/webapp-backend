@@ -30,6 +30,8 @@ class UserResource extends JsonResource
 
         $data = [
             ...parent::toArray($request),
+            'locale' => $this->preferredLocale(),
+            'organization_role' => $this->membershipRole()?->value,
             'is_deleted' => (bool) $this->deleted_at,
             'roleNames' => $this->whenLoaded('roles') ? $this->getRoleNames() : [],
             'roles' => RoleSlimResource::collection($this->whenLoaded('roles')),

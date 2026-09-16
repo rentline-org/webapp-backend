@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ContactPersonType;
+use App\Enums\ContactIdentityKind;
+use App\Enums\ContactTaxIdType;
 use App\Models\Scopes\OrganizationScope;
 use App\Services\Organization\ActiveOrganizationContext;
 use Database\Factories\ContactFactory;
@@ -48,15 +50,32 @@ class Contact extends Model
 
     protected $fillable = [
         'organization_id',
+        'user_id',
         'name',
         'email',
         'phone',
         'type',
+        'identity_kind',
+        'preferred_locale',
+        'tax_id_type',
+        'tax_id_encrypted',
+        'tax_id_hash',
+        'tax_id_last4',
     ];
 
-    protected $casts = [
-        'type' => ContactPersonType::class,
+    protected $hidden = [
+        'tax_id_encrypted',
+        'tax_id_hash',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'type' => ContactPersonType::class,
+            'identity_kind' => ContactIdentityKind::class,
+            'tax_id_type' => ContactTaxIdType::class,
+        ];
+    }
 
     public function organization(): BelongsTo
     {
@@ -68,9 +87,41 @@ class Contact extends Model
         return $this->belongsToMany(Property::class)->withTimestamps();
     }
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(ContactAssignment::class);
+    }
+
+    public function leaseParties(): HasMany
+    {
+        return $this->hasMany(LeaseParty::class);
+    }
+
     public function leases(): HasMany
     {
         return $this->hasMany(Lease::class, 'tenant_contact_id');
+    }
+
+    public function documentParties(): HasMany
+    {
+        return $this->hasMany(DocumentParty::class);
+    }
+
+    public function maskedTaxId(): ?string
+    {
+        if ($this->tax_id_last4 === null || $this->tax_id_type === null) {
+            return null;
+        }
+
+        return match ($this->tax_id_type) {
+            ContactTaxIdType::CPF => '***.***.***-'.$this->tax_id_last4,
+            ContactTaxIdType::CNPJ => '**.***.***/****-'.$this->tax_id_last4,
+        };
     }
 
     /**

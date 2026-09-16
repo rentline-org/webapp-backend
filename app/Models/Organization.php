@@ -140,7 +140,14 @@ class Organization extends Model implements HasMedia
 
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class)->withTimestamps();
+        return $this->belongsToMany(User::class)
+            ->withPivot(['role', 'status', 'invited_by', 'accepted_at'])
+            ->withTimestamps();
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(OrganizationInvitation::class);
     }
 
     public function contacts(): HasMany
@@ -151,6 +158,16 @@ class Organization extends Model implements HasMedia
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class);
+    }
+
+    public function leases(): HasMany
+    {
+        return $this->hasMany(Lease::class);
+    }
+
+    public function contactAssignments(): HasMany
+    {
+        return $this->hasMany(ContactAssignment::class);
     }
 
     public function properties(): HasMany

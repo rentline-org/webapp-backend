@@ -22,6 +22,10 @@ class OrganizationResource extends JsonResource
 
         $data = [
             ...parent::toArray($request),
+            'membership' => $this->whenPivotLoaded('organization_user', fn () => [
+                'role' => $this->pivot->role,
+                'status' => $this->pivot->status,
+            ]),
             'properties_count' => $this->whenCounted('properties'),
             'users' => UserResource::collection($this->whenLoaded('users')),
             'listing' => ListingResource::make($this->whenLoaded('listing')),

@@ -59,6 +59,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
@@ -103,7 +105,7 @@ return [
     | Example: ['en', 'bn'] means the application supports English and Bengali.
     |
     */
-    'supported_locales' => ['en'],
+    'supported_locales' => ['en', 'pt-BR'],
 
     /*
     |--------------------------------------------------------------------------

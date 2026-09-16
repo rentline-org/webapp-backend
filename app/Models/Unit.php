@@ -4,6 +4,9 @@ namespace App\Models;
 
 use App\Enums\MediaCollection;
 use App\Enums\PropertyType;
+use App\Enums\PropertyOperationalStatus;
+use App\Enums\LeaseWorkflowStatus;
+use App\Enums\UnitOccupancyStatus;
 use App\Enums\UnitType;
 use App\Traits\HasGallery;
 use App\Traits\HasSlug;
@@ -95,6 +98,8 @@ class Unit extends Model implements HasMedia
         'sale_types',
 
         'available_from',
+        'operational_status',
+        'archived_at',
     ];
 
     protected $casts = [
@@ -114,6 +119,8 @@ class Unit extends Model implements HasMedia
         'sale_types' => 'array',
 
         'available_from' => 'date',
+        'operational_status' => PropertyOperationalStatus::class,
+        'archived_at' => 'datetime',
     ];
 
     public function property(): BelongsTo
@@ -124,6 +131,44 @@ class Unit extends Model implements HasMedia
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class);
+    }
+
+    public function leases(): HasMany
+    {
+        return $this->hasMany(Lease::class);
+    }
+
+    public function contactAssignments(): HasMany
+    {
+        return $this->hasMany(ContactAssignment::class);
+    }
+
+    public function occupancyStatus(): UnitOccupancyStatus
+    {
+        $today = today()->toDateString();
+        $leases = $this->relationLoaded('leases')
+            ? $this->leases
+            : $this->leases()->where('workflow_status', LeaseWorkflowStatus::ACTIVE->value)->get();
+
+        if ($leases->contains(fn (Lease $lease): bool => $lease->workflow_status === LeaseWorkflowStatus::ACTIVE
+            && $lease->starts_on?->toDateString() <= $today
+            && $lease->ends_on?->toDateString() >= $today)) {
+            return UnitOccupancyStatus::OCCUPIED;
+        }
+
+        if ($leases->contains(fn (Lease $lease): bool => $lease->workflow_status === LeaseWorkflowStatus::ACTIVE
+            && $lease->starts_on?->toDateString() > $today)) {
+            return UnitOccupancyStatus::RESERVED;
+        }
+
+        return UnitOccupancyStatus::VACANT;
+    }
+
+    public function isOperationallyAvailable(): bool
+    {
+        return $this->operational_status === PropertyOperationalStatus::ACTIVE
+            && $this->archived_at === null
+            && $this->occupancyStatus() === UnitOccupancyStatus::VACANT;
     }
 
     public function registerMediaCollections(): void

@@ -37,6 +37,7 @@ class UnitController extends Controller
                 'max_rent_price',
                 'bedrooms',
                 'bathrooms',
+                'include_archived',
             ]),
             perPage: (int) $request->input('per_page', 15)
         );
@@ -65,7 +66,7 @@ class UnitController extends Controller
         $this->ensureUnitBelongsToProperty($property, $unit);
 
         return new UnitResource(
-            $unit->load('property')
+            $unit->load(['property', 'leases', 'contactAssignments.contact'])
         );
     }
 

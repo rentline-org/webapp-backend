@@ -19,8 +19,9 @@ class UserDTO
         public readonly ?string $phone,
         public readonly ?bool $isActive,
         public readonly ?array $roles,
-        public readonly ?array $urls,
-        public readonly ?DateTimeInterface $dob,
+        public readonly ?array $urls = null,
+        public readonly ?DateTimeInterface $dob = null,
+        public readonly ?string $locale = null,
     ) {}
 
     public static function fromRequest(Request $request, ?User $existing = null, ?array $roles = null): self
@@ -40,6 +41,7 @@ class UserDTO
             is_array($roles) ? $roles : null,
             $request->input('urls'),
             $request->date('dob'),
+            $request->input('locale'),
         );
     }
 
@@ -57,6 +59,7 @@ class UserDTO
             isset($data['roles']) && is_array($data['roles']) ? $data['roles'] : null,
             $data['urls'] ?? null,
             $data['dob'] ?? null,
+            $data['locale'] ?? null,
         );
     }
 
@@ -68,6 +71,7 @@ class UserDTO
             'last_name' => $this->lastName,
             'name' => $this->name,
             'email' => $this->email,
+            'locale' => $this->locale,
             'password' => $this->password,
             'phone' => $this->phone,
             'is_active' => $this->isActive,

@@ -4,11 +4,16 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\MediaCollection;
+use App\Enums\OrganizationMemberRole;
+use App\Enums\OrganizationMemberStatus;
 use App\Enums\UserRole;
+use App\Services\Organization\ActiveOrganizationContext;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -81,7 +86,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @method static Builder<static>|User withoutRole($roles, $guard = null)
  * @mixin \Eloquent
  */
-class User extends Authenticatable implements HasMedia
+class User extends Authenticatable implements HasLocalePreference, HasMedia
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, InteractsWithMedia, MustVerifyEmail, Notifiable;
@@ -96,6 +101,7 @@ class User extends Authenticatable implements HasMedia
         'last_name',
         'name',
         'email',
+        'locale',
         'password',
         'urls',
         'dob',
@@ -150,9 +156,91 @@ class User extends Authenticatable implements HasMedia
         });
     }
 
-    public function organizations()
+    public function organizations(): BelongsToMany
     {
-        return $this->belongsToMany(Organization::class)->withTimestamps();
+        return $this->belongsToMany(Organization::class)
+            ->withPivot(['role', 'status', 'invited_by', 'accepted_at'])
+            ->withTimestamps();
+    }
+
+    public function sentOrganizationInvitations(): HasMany
+    {
+        return $this->hasMany(OrganizationInvitation::class, 'invited_by');
+    }
+
+    public function preferredLocale(): string
+    {
+        return in_array($this->locale, config('app.supported_locales', ['en']), true)
+            ? $this->locale
+            : config('app.fallback_locale', 'en');
+    }
+
+    public function membershipRole(?int $organizationId = null): ?OrganizationMemberRole
+    {
+        if ($this->isSuperAdmin()) {
+            return OrganizationMemberRole::OWNER;
+        }
+
+        $organizationId ??= app(ActiveOrganizationContext::class)->id();
+
+        if ($organizationId === null) {
+            return null;
+        }
+
+        $membership = $this->organizations()
+            ->whereKey($organizationId)
+            ->wherePivot('status', OrganizationMemberStatus::ACTIVE->value)
+            ->first()?->pivot;
+
+        if ($membership === null) {
+            return null;
+        }
+
+        $role = OrganizationMemberRole::tryFrom((string) $membership->role);
+
+        // Existing tenant records predate organization roles and receive the
+        // pivot default during migration. Preserve their restricted access.
+        if (
+            $role === OrganizationMemberRole::MANAGER
+            && $this->hasRole(UserRole::TENANT)
+            && ! $this->hasRole(UserRole::LANDLORD)
+        ) {
+            return OrganizationMemberRole::TENANT;
+        }
+
+        return $role;
+    }
+
+    /** @param list<OrganizationMemberRole|string> $roles */
+    public function hasActiveOrganizationRole(array $roles, ?int $organizationId = null): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        $membershipRole = $this->membershipRole($organizationId);
+        $allowedRoles = array_map(
+            fn (OrganizationMemberRole|string $role): string => $role instanceof OrganizationMemberRole ? $role->value : $role,
+            $roles,
+        );
+
+        return $membershipRole !== null && in_array($membershipRole->value, $allowedRoles, true);
+    }
+
+    public function canManageActiveOrganization(?int $organizationId = null): bool
+    {
+        return $this->hasActiveOrganizationRole(
+            OrganizationMemberRole::administrativeRoles(),
+            $organizationId,
+        );
+    }
+
+    public function canOperateActiveOrganization(?int $organizationId = null): bool
+    {
+        return $this->hasActiveOrganizationRole(
+            OrganizationMemberRole::operationalRoles(),
+            $organizationId,
+        );
     }
 
     public function uploadedDocuments(): HasMany

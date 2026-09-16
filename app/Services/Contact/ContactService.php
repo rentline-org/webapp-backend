@@ -10,6 +10,7 @@ use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Validation\ValidationException;
 
 class ContactService
@@ -38,7 +39,7 @@ class ContactService
 
             return $this->contactRepository->create(
                 [
-                    ...$dto->toArray(),
+                    ...$this->contactAttributes($dto),
                     'organization_id' => $organizationId,
                 ],
                 $propertyIds
@@ -58,7 +59,7 @@ class ContactService
 
             return $this->contactRepository->update(
                 $contact,
-                $dto->toArray(),
+                $this->contactAttributes($dto),
                 $propertyIds
             );
         });
@@ -90,6 +91,35 @@ class ContactService
         if ($contact->organization_id !== $organizationId) {
             throw new AuthorizationException;
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function contactAttributes(ContactDTO $dto): array
+    {
+        $attributes = $dto->toArray();
+
+        if (! $dto->taxIdProvided) {
+            return $attributes;
+        }
+
+        if ($dto->taxId === null || trim($dto->taxId) === '') {
+            return [
+                ...$attributes,
+                'tax_id_type' => null,
+                'tax_id_encrypted' => null,
+                'tax_id_hash' => null,
+                'tax_id_last4' => null,
+            ];
+        }
+
+        $normalized = preg_replace('/\D/', '', $dto->taxId) ?? '';
+
+        return [
+            ...$attributes,
+            'tax_id_encrypted' => Crypt::encryptString($normalized),
+            'tax_id_hash' => hash_hmac('sha256', $normalized, (string) config('app.key')),
+            'tax_id_last4' => substr($normalized, -4),
+        ];
     }
 
     /**

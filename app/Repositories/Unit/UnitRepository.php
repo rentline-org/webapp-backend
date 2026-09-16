@@ -53,10 +53,19 @@ class UnitRepository implements UnitRepositoryInterface
 
     protected function query(Property $property, array $filters = [])
     {
-        $query = $property->units(); // ✅ keep relationship context
+        $query = $property->units()->with(['leases', 'contactAssignments.contact']);
+
+        if (empty($filters['include_archived'])) {
+            $query->whereNull('archived_at');
+        }
 
         if (array_key_exists('is_available', $filters) && $filters['is_available'] !== null) {
-            $query->where('is_available', (bool) $filters['is_available']);
+            $available = filter_var($filters['is_available'], FILTER_VALIDATE_BOOL);
+            $query->where('operational_status', 'active');
+            $method = $available ? 'whereDoesntHave' : 'whereHas';
+            $query->{$method}('leases', fn (Builder $leaseQuery) => $leaseQuery
+                ->where('workflow_status', 'active')
+                ->whereDate('ends_on', '>=', today()));
         }
 
         if (! empty($filters['min_rent_price'])) {

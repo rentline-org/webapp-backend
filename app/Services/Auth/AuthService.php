@@ -3,6 +3,7 @@
 namespace App\Services\Auth;
 
 use App\Enums\ApiErrorCode;
+use App\Enums\OrganizationMemberStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Events\OtpRequested;
@@ -190,7 +191,13 @@ class AuthService
 
     public function selectOrganization(User $user, int $organizationId): array
     {
-        if (! $user->organizations()->whereKey($organizationId)->exists()) {
+        if (
+            ! $user->isSuperAdmin()
+            && ! $user->organizations()
+                ->whereKey($organizationId)
+                ->wherePivot('status', OrganizationMemberStatus::ACTIVE->value)
+                ->exists()
+        ) {
             throw new AuthorizationException('User does not belong to this organization.');
         }
 

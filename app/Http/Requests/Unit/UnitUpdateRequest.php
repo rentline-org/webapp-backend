@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Unit;
 
 use App\Enums\UnitType;
+use App\Enums\PropertyOperationalStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -30,6 +31,7 @@ class UnitUpdateRequest extends FormRequest
             'is_available' => ['sometimes', 'boolean'],
             'is_furnished' => ['sometimes', 'boolean'],
             'is_pet_friendly' => ['sometimes', 'boolean'],
+            'operational_status' => ['sometimes', Rule::enum(PropertyOperationalStatus::class)],
 
             // Pricing
             'rent_price' => ['sometimes', 'nullable', 'numeric', 'min:0'],

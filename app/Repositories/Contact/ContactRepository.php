@@ -26,7 +26,7 @@ class ContactRepository implements ContactRepositoryInterface
             $contact = Contact::query()->create($data);
             $contact->properties()->sync($propertyIds);
 
-            return $contact->load('properties');
+            return $contact->load(['properties', 'assignments.property', 'assignments.unit']);
         });
     }
 
@@ -39,7 +39,7 @@ class ContactRepository implements ContactRepositoryInterface
                 $contact->properties()->sync($propertyIds);
             }
 
-            return $contact->refresh()->load('properties');
+            return $contact->refresh()->load(['properties', 'assignments.property', 'assignments.unit']);
         });
     }
 
@@ -53,7 +53,11 @@ class ContactRepository implements ContactRepositoryInterface
     {
         $query = Contact::query()
             ->where('organization_id', $organizationId)
-            ->with(['properties:id,slug,title']);
+            ->with([
+                'properties:id,slug,title',
+                'assignments.property:id,slug,title',
+                'assignments.unit:id,property_id,slug,name',
+            ]);
 
         if (! empty($filters['search'])) {
             $search = '%' . trim($filters['search']) . '%';
@@ -70,10 +74,15 @@ class ContactRepository implements ContactRepositoryInterface
         }
 
         if (! empty($filters['property_id'])) {
-            $query->whereHas(
-                'properties',
-                fn (Builder $query) => $query->whereKey($filters['property_id'])
-            );
+            $query->where(function (Builder $query) use ($filters): void {
+                $query->whereHas(
+                    'properties',
+                    fn (Builder $propertyQuery) => $propertyQuery->whereKey($filters['property_id'])
+                )->orWhereHas(
+                    'assignments',
+                    fn (Builder $assignmentQuery) => $assignmentQuery->where('property_id', $filters['property_id'])
+                );
+            });
         }
 
         return $query->latest();

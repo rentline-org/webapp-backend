@@ -16,19 +16,34 @@ class LanguageMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Try to get the locale from the Accept-Language header, or use app.locale, or fallback_locale if not set
-        $locale = explode(',', $request->header('Accept-Language'))[0]
-            ?? config('app.locale')
-            ?? config('app.fallback_locale');
-
-        // Check if the locale is supported or is a wildcard ("*")
-        if ($locale === '*' || ! in_array($locale, config('app.supported_locales', []))) {
-            $locale = config('app.fallback_locale', config('app.locale')); // Fallback to default locale if unsupported
-        }
+        $locale = $this->resolveLocale($request->header('Accept-Language'));
 
         app()->setLocale($locale);
-        Carbon::setLocale($locale);
+        Carbon::setLocale($locale === 'pt-BR' ? 'pt_BR' : $locale);
 
-        return $next($request);
+        $response = $next($request);
+        $response->headers->set('Content-Language', $locale);
+
+        return $response;
+    }
+
+    private function resolveLocale(?string $acceptLanguage): string
+    {
+        $supported = config('app.supported_locales', ['en']);
+
+        foreach (explode(',', $acceptLanguage ?? '') as $preference) {
+            $language = mb_strtolower(trim(explode(';', $preference)[0]));
+            $normalized = match (true) {
+                $language === 'pt', str_starts_with($language, 'pt-'), str_starts_with($language, 'pt_') => 'pt-BR',
+                $language === 'en', str_starts_with($language, 'en-'), str_starts_with($language, 'en_') => 'en',
+                default => null,
+            };
+
+            if ($normalized !== null && in_array($normalized, $supported, true)) {
+                return $normalized;
+            }
+        }
+
+        return config('app.fallback_locale', config('app.locale', 'en'));
     }
 }

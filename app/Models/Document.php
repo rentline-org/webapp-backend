@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DocumentLifecycle;
 use App\Enums\DocumentType;
 use App\Enums\MediaCollection;
 use App\Models\Scopes\OrganizationScope;
@@ -9,6 +10,8 @@ use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -25,21 +28,36 @@ class Document extends Model implements HasMedia
         'uploaded_by',
         'signed_by',
         'type',
+        'document_kind_id',
+        'lifecycle',
         'title',
         'purpose',
         'description',
+        'reference_number',
+        'issued_on',
+        'effective_on',
+        'expires_on',
+        'metadata',
+        'supersedes_document_id',
         'requires_signature',
         'is_signed',
         'signed_at',
+        'archived_at',
     ];
 
     protected function casts(): array
     {
         return [
             'type' => DocumentType::class,
+            'lifecycle' => DocumentLifecycle::class,
+            'issued_on' => 'date',
+            'effective_on' => 'date',
+            'expires_on' => 'date',
+            'metadata' => 'array',
             'requires_signature' => 'boolean',
             'is_signed' => 'boolean',
             'signed_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
     }
 
@@ -68,6 +86,67 @@ class Document extends Model implements HasMedia
         return $this->belongsTo(User::class, 'signed_by');
     }
 
+    public function customKind(): BelongsTo
+    {
+        return $this->belongsTo(DocumentKind::class, 'document_kind_id');
+    }
+
+    public function supersedes(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'supersedes_document_id');
+    }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(DocumentVersion::class)->orderByDesc('version_number');
+    }
+
+    public function currentVersion(): HasOne
+    {
+        return $this->hasOne(DocumentVersion::class)->ofMany('version_number', 'max');
+    }
+
+    public function parties(): HasMany
+    {
+        return $this->hasMany(DocumentParty::class);
+    }
+
+    public function requiredSigners(): HasMany
+    {
+        return $this->hasMany(DocumentSigner::class);
+    }
+
+    public function shares(): HasMany
+    {
+        return $this->hasMany(DocumentShare::class);
+    }
+
+    public function auditEvents(): HasMany
+    {
+        return $this->hasMany(DocumentAuditEvent::class)->latest('id');
+    }
+
+    public function properties(): BelongsToMany
+    {
+        return $this->belongsToMany(Property::class, 'document_property')
+            ->withPivot('relation_type')
+            ->withTimestamps();
+    }
+
+    public function units(): BelongsToMany
+    {
+        return $this->belongsToMany(Unit::class, 'document_unit')
+            ->withPivot('relation_type')
+            ->withTimestamps();
+    }
+
+    public function leases(): BelongsToMany
+    {
+        return $this->belongsToMany(Lease::class, 'document_lease')
+            ->withPivot('relation_type')
+            ->withTimestamps();
+    }
+
     public function lease(): HasOne
     {
         return $this->hasOne(Lease::class);
@@ -90,13 +169,15 @@ class Document extends Model implements HasMedia
 
         $this->addMediaCollection(MediaCollection::DOCUMENT_ORIGINAL->value)
             ->useDisk(config('filesystems.document_disk'))
-            ->acceptsMimeTypes($acceptedMimeTypes)
-            ->singleFile();
+            ->acceptsMimeTypes($acceptedMimeTypes);
 
         $this->addMediaCollection(MediaCollection::DOCUMENT_SIGNED->value)
             ->useDisk(config('filesystems.document_disk'))
-            ->acceptsMimeTypes($acceptedMimeTypes)
-            ->singleFile();
+            ->acceptsMimeTypes($acceptedMimeTypes);
+
+        $this->addMediaCollection(MediaCollection::DOCUMENT_SUPPORTING->value)
+            ->useDisk(config('filesystems.document_disk'))
+            ->acceptsMimeTypes($acceptedMimeTypes);
     }
 
     /**

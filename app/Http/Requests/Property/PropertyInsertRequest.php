@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Property;
 
 use App\Enums\PropertyType;
+use App\Enums\PropertyOperationalStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -34,6 +35,7 @@ class PropertyInsertRequest extends FormRequest
                 'required',
                 Rule::in(array_column(PropertyType::cases(), 'value')),
             ],
+            'operational_status' => ['sometimes', Rule::enum(PropertyOperationalStatus::class)],
 
             'slug' => ['nullable', 'string', 'max:255'],
 
@@ -47,6 +49,7 @@ class PropertyInsertRequest extends FormRequest
             'units.*.is_available' => ['sometimes', 'boolean'],
             'units.*.is_furnished' => ['sometimes', 'boolean'],
             'units.*.is_pet_friendly' => ['sometimes', 'boolean'],
+            'units.*.operational_status' => ['sometimes', Rule::enum(PropertyOperationalStatus::class)],
 
             'units.*.rent_price' => ['nullable', 'numeric', 'min:0'],
             'units.*.sale_price' => ['nullable', 'numeric', 'min:0'],

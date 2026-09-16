@@ -28,6 +28,7 @@ include 'api/v1/DataProcessingJobRoutes.php';
 include 'api/v1/OrganizationRoutes.php';
 include 'api/v1/PropertyRoutes.php';
 include 'api/v1/ContactRoutes.php';
+include 'api/v1/LeaseRoutes.php';
 include 'api/v1/DocumentRoutes.php';
 include 'api/v1/UnitRoutes.php';
 include 'api/v1/ListingRoutes.php';

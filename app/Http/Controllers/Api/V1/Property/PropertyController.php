@@ -36,6 +36,7 @@ class PropertyController extends Controller
             'state',
             'country',
             'with_units',
+            'include_archived',
         ]);
 
         // 🚨 price filtering is now UNIT responsibility
@@ -78,7 +79,7 @@ class PropertyController extends Controller
         Gate::authorize('view', $property);
 
         return PropertyResource::make(
-            $property->load(['units', 'organization'])->loadCount('units')
+            $property->load(['units.leases', 'organization', 'contactAssignments.contact'])->loadCount('units')
         );
     }
 
@@ -89,7 +90,7 @@ class PropertyController extends Controller
         Gate::authorize('view', $property);
 
         return PropertyResource::make(
-            $property->load(['units', 'organization'])->loadCount('units')
+            $property->load(['units.leases', 'organization', 'contactAssignments.contact'])->loadCount('units')
         );
     }
 

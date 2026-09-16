@@ -52,7 +52,12 @@ class ContactController extends Controller
     {
         Gate::authorize('view', $contact);
 
-        return ContactResource::make($contact->load('properties'));
+        return ContactResource::make($contact->load([
+            'properties',
+            'assignments.property',
+            'assignments.unit',
+            'leaseParties.lease',
+        ]));
     }
 
     /** Update the specified resource in storage. */

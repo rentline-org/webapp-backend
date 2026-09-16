@@ -28,12 +28,12 @@ class DocumentSignatureController extends Controller
         );
     }
 
-    public function destroy(Document $document)
+    public function destroy(\Illuminate\Http\Request $request, Document $document)
     {
         Gate::authorize('update', $document);
 
         return DocumentResource::make(
-            $this->documentService->markUnsigned($document)
+            $this->documentService->markUnsigned($document, $request->user()->id)
         );
     }
 }

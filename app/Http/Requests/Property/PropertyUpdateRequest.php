@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Property;
 
 use App\Enums\PropertyType;
+use App\Enums\PropertyOperationalStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -32,6 +33,7 @@ class PropertyUpdateRequest extends FormRequest
                 'sometimes',
                 Rule::in(array_column(PropertyType::cases(), 'value')),
             ],
+            'operational_status' => ['sometimes', Rule::enum(PropertyOperationalStatus::class)],
 
             // Optional slug update
             'slug' => ['sometimes', 'nullable', 'string', 'max:255'],

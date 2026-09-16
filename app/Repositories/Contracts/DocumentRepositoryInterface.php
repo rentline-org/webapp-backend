@@ -3,11 +3,11 @@
 namespace App\Repositories\Contracts;
 
 use App\Models\Document;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 interface DocumentRepositoryInterface
 {
-    public function all(int $organizationId, array $filters = []): Collection;
+    public function paginate(int $organizationId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
 
     public function create(array $attributes, ?array $leaseAttributes = null): Document;
 

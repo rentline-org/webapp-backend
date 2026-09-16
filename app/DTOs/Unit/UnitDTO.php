@@ -3,6 +3,7 @@
 namespace App\DTOs\Unit;
 
 use App\Enums\UnitType;
+use App\Enums\PropertyOperationalStatus;
 use App\Models\Unit;
 use Illuminate\Http\Request;
 
@@ -24,6 +25,7 @@ class UnitDTO
         public ?array $amenities,
         public ?string $available_from,
         public bool $is_pet_friendly,
+        public PropertyOperationalStatus $operational_status,
     ) {}
 
     public static function fromRequest(Request $request, ?Unit $existing = null): self
@@ -80,6 +82,9 @@ class UnitDTO
                 'is_pet_friendly',
                 $existing?->is_pet_friendly ?? false
             ),
+            operational_status: PropertyOperationalStatus::from(
+                $request->input('operational_status', $existing?->operational_status?->value ?? PropertyOperationalStatus::ACTIVE->value)
+            ),
         );
     }
 
@@ -120,6 +125,7 @@ class UnitDTO
             amenities: $data['amenities'] ?? null,
 
             available_from: $data['available_from'] ?? null,
+            operational_status: PropertyOperationalStatus::from($data['operational_status'] ?? PropertyOperationalStatus::ACTIVE->value),
 
         );
     }
@@ -143,6 +149,7 @@ class UnitDTO
             'amenities' => $this->amenities,
             'available_from' => $this->available_from,
             'is_pet_friendly' => $this->is_pet_friendly,
+            'operational_status' => $this->operational_status->value,
         ];
     }
 

@@ -56,9 +56,7 @@ class OrganizationService
         $payload = [...$data->toArray(), 'owner_id' => $user->id, 'trial_ends_at' => now()->addDays(14)];
         $organization = $this->organizationRepository->create($payload);
 
-        if ($user->isLandlord()) {
-            $this->organizationRepository->assignUserToOrganization($user->id, $organization->id);
-        }
+        $this->organizationRepository->assignUserToOrganization($user->id, $organization->id);
 
         event(new OrganizationCreated($user, $organization));
         return $organization;

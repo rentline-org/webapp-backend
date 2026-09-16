@@ -35,6 +35,7 @@ class UserFactory extends Factory
             'user_name' => fake()->userName(),
             'phone' => fake()->phoneNumber(),
             'email' => fake()->unique()->safeEmail(),
+            'locale' => 'en',
             'email_verified_at' => now(),
             'phone_verified_at' => now(),
             'password' => static::$password ??= Hash::make('qwerty123'), // development friendly password

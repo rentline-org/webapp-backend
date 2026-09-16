@@ -12,6 +12,7 @@ use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class PropertyService
@@ -115,6 +116,16 @@ class PropertyService
      */
     public function delete(Property $property): bool
     {
-        return $this->propertyRepository->delete($property);
+        return DB::transaction(function () use ($property): bool {
+            $property->units()->update([
+                'operational_status' => 'off_market',
+                'archived_at' => now(),
+            ]);
+
+            return $property->update([
+                'operational_status' => 'off_market',
+                'archived_at' => now(),
+            ]);
+        });
     }
 }

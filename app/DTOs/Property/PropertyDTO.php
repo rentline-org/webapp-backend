@@ -3,6 +3,7 @@
 namespace App\DTOs\Property;
 
 use App\Enums\PropertyType;
+use App\Enums\PropertyOperationalStatus;
 use App\Models\Property;
 use Illuminate\Http\Request;
 
@@ -22,6 +23,7 @@ class PropertyDTO
         public ?string $country,
 
         public PropertyType $property_type,
+        public PropertyOperationalStatus $operational_status,
     ) {}
 
     public static function fromRequest(Request $request, ?Property $existing = null): self
@@ -43,6 +45,9 @@ class PropertyDTO
             property_type: PropertyType::from(
                 $request->input('property_type', $existing?->property_type?->value)
             ),
+            operational_status: PropertyOperationalStatus::from(
+                $request->input('operational_status', $existing?->operational_status?->value ?? PropertyOperationalStatus::ACTIVE->value)
+            ),
         );
     }
 
@@ -62,6 +67,7 @@ class PropertyDTO
             country: $data['country'] ?? null,
 
             property_type: PropertyType::from($data['property_type']),
+            operational_status: PropertyOperationalStatus::from($data['operational_status'] ?? PropertyOperationalStatus::ACTIVE->value),
         );
     }
 
@@ -81,6 +87,7 @@ class PropertyDTO
             'country' => $this->country,
 
             'property_type' => $this->property_type->value,
+            'operational_status' => $this->operational_status->value,
         ];
     }
 }

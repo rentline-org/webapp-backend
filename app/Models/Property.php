@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\MediaCollection;
 use App\Enums\PropertyType;
+use App\Enums\PropertyOperationalStatus;
 use App\Enums\UnitType;
 use App\Helpers\OrganizationHelper;
 use App\Models\Scopes\OrganizationScope;
@@ -87,11 +88,18 @@ class Property extends Model implements HasMedia
         'full_address',
         'address_number',
         'region_code',
+        'operational_status',
+        'archived_at',
     ];
 
-    protected $casts = [
-        'property_type' => PropertyType::class,
-    ];
+    protected function casts(): array
+    {
+        return [
+            'property_type' => PropertyType::class,
+            'operational_status' => PropertyOperationalStatus::class,
+            'archived_at' => 'datetime',
+        ];
+    }
 
     public function units(): HasMany
     {
@@ -111,6 +119,16 @@ class Property extends Model implements HasMedia
     public function contacts(): BelongsToMany
     {
         return $this->belongsToMany(Contact::class)->withTimestamps();
+    }
+
+    public function contactAssignments(): HasMany
+    {
+        return $this->hasMany(ContactAssignment::class);
+    }
+
+    public function leases(): HasMany
+    {
+        return $this->hasMany(Lease::class);
     }
 
     public function documents(): HasMany

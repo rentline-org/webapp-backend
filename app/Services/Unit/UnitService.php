@@ -60,7 +60,10 @@ class UnitService
 
     public function delete(Unit $unit): bool
     {
-        return $this->unitRepository->delete($unit);
+        return $unit->update([
+            'operational_status' => 'off_market',
+            'archived_at' => now(),
+        ]);
     }
 
     /** Validate that a unit type is allowed for the given property type. */

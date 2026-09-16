@@ -15,4 +15,5 @@ enum MediaCollection: string
 
     case DOCUMENT_ORIGINAL = 'document_original';
     case DOCUMENT_SIGNED = 'document_signed';
+    case DOCUMENT_SUPPORTING = 'document_supporting';
 }

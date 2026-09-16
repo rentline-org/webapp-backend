@@ -4,6 +4,8 @@ namespace App\Repositories\Organization;
 
 use App\DTOs\Organization\OrganizationDTO;
 use App\Enums\MediaCollection;
+use App\Enums\OrganizationMemberRole;
+use App\Enums\OrganizationMemberStatus;
 use App\Models\Organization;
 use App\Models\User;
 use App\Repositories\Contracts\OrganizationRepositoryInterface;
@@ -30,7 +32,13 @@ class OrganizationRepository implements OrganizationRepositoryInterface
             $user = User::findOrFail($userId);
             $organization = Organization::findOrFail($organizationId);
 
-            $user->organizations()->syncWithoutDetaching([$organization->id]);
+            $user->organizations()->syncWithoutDetaching([
+                $organization->id => [
+                    'role' => OrganizationMemberRole::OWNER->value,
+                    'status' => OrganizationMemberStatus::ACTIVE->value,
+                    'accepted_at' => now(),
+                ],
+            ]);
         });
     }
 
@@ -78,6 +86,7 @@ class OrganizationRepository implements OrganizationRepositoryInterface
         $user = User::query()->findOrFail($userId);
 
         return $user->organizations()
+            ->wherePivot('status', OrganizationMemberStatus::ACTIVE->value)
             ->withCount('properties')
             ->get()
             ->all();

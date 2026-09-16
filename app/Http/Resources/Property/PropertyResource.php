@@ -16,6 +16,13 @@ class PropertyResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $primaryUnit = $this->relationLoaded('units')
+            ? $this->units->firstWhere('archived_at', null)
+            : $this->primaryUnit();
+        $activeUnits = $this->relationLoaded('units')
+            ? $this->units->whereNull('archived_at')
+            : collect();
+
         return [
             'id' => $this->id,
             'organization_id' => $this->organization_id,
@@ -28,16 +35,25 @@ class PropertyResource extends JsonResource
             'postal_code' => $this->postal_code,
             'country' => $this->country,
             'property_type' => $this->property_type,
-            'is_available' => $this->is_available,
-            'is_furnished' => $this->is_furnished,
-            'sale_price' => $this->sale_price,
-            'bedrooms' => $this->bedrooms,
-            'bathrooms' => $this->bathrooms,
-            'square_feet' => $this->square_feet,
-            'amenities' => $this->amenities,
-            'available_from' => $this->available_from,
-            'is_pet_friendly' => $this->is_pet_friendly,
-            'sale_types' => $this->sale_types,
+            'operational_status' => $this->operational_status?->value ?? $this->operational_status,
+            'archived_at' => $this->archived_at,
+            'is_available' => $primaryUnit?->isOperationallyAvailable(),
+            'is_furnished' => $primaryUnit?->is_furnished,
+            'rent_price' => $primaryUnit?->rent_price,
+            'sale_price' => $primaryUnit?->sale_price,
+            'buy_price' => $primaryUnit?->buy_price,
+            'bedrooms' => $primaryUnit?->bedrooms,
+            'bathrooms' => $primaryUnit?->bathrooms,
+            'square_feet' => $primaryUnit?->square_feet,
+            'amenities' => $primaryUnit?->amenities,
+            'available_from' => $primaryUnit?->available_from,
+            'is_pet_friendly' => $primaryUnit?->is_pet_friendly,
+            'sale_types' => $primaryUnit?->sale_types,
+            'occupancy_summary' => $this->when($this->relationLoaded('units'), fn () => [
+                'vacant' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus()->value === 'vacant')->count(),
+                'reserved' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus()->value === 'reserved')->count(),
+                'occupied' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus()->value === 'occupied')->count(),
+            ]),
             'thumbnail' => $this->thumbnail(),
             'gallery_urls' => $this->gallery(),
             'media' => $this->whenLoaded('media'),
@@ -54,6 +70,14 @@ class PropertyResource extends JsonResource
             'units' => UnitResource::collection(
                 $this->whenLoaded('units')
             ),
+            'contact_assignments' => $this->whenLoaded('contactAssignments', fn () => $this->contactAssignments->map(fn ($assignment) => [
+                'id' => $assignment->id,
+                'contact_id' => $assignment->contact_id,
+                'unit_id' => $assignment->unit_id,
+                'role' => $assignment->role?->value ?? $assignment->role,
+                'source' => $assignment->source?->value ?? $assignment->source,
+                'name' => $assignment->contact?->name,
+            ])->values()),
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Document;
 
 use App\DTOs\Document\DocumentDTO;
+use App\Enums\DocumentLifecycle;
 use App\Enums\DocumentType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Document\DocumentInsertUpdateRequest;
@@ -30,10 +31,20 @@ class DocumentController extends Controller
         $documents = $this->documentService->all($request->validate([
             'search' => ['sometimes', 'string', 'max:255'],
             'type' => ['sometimes', Rule::enum(DocumentType::class)],
+            'custom_kind_id' => ['sometimes', 'integer', 'min:1'],
+            'lifecycle' => ['sometimes', Rule::enum(DocumentLifecycle::class)],
             'property_id' => ['sometimes', 'integer', 'min:1'],
             'unit_id' => ['sometimes', 'integer', 'min:1'],
+            'lease_id' => ['sometimes', 'integer', 'min:1'],
+            'contact_id' => ['sometimes', 'integer', 'min:1'],
+            'party_role' => ['sometimes', 'string', 'max:50'],
             'signature_status' => ['sometimes', Rule::in(['signed', 'pending', 'not_required'])],
-        ]));
+            'visibility' => ['sometimes', Rule::in(['shared', 'internal'])],
+            'expires_from' => ['sometimes', 'date_format:Y-m-d'],
+            'expires_to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:expires_from'],
+            'per_page' => ['sometimes', 'integer', 'between:1,100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]), $request->integer('per_page', 15));
 
         return DocumentResource::collection($documents);
     }
@@ -65,6 +76,7 @@ class DocumentController extends Controller
             $this->documentService->update(
                 $document,
                 DocumentDTO::fromRequest($request),
+                $request->user()->id,
             )
         );
     }
@@ -73,8 +85,17 @@ class DocumentController extends Controller
     {
         Gate::authorize('delete', $document);
 
-        $this->documentService->delete($document);
+        $this->documentService->delete($document, request()->user()->id);
 
         return response()->noContent();
+    }
+
+    public function archive(Request $request, Document $document)
+    {
+        Gate::authorize('update', $document);
+
+        return DocumentResource::make(
+            $this->documentService->archive($document, $request->user()->id)
+        );
     }
 }

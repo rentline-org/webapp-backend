@@ -4,6 +4,7 @@ namespace App\Http\Requests\User;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UserProfileUpdateRequest extends FormRequest
 {
@@ -27,6 +28,7 @@ class UserProfileUpdateRequest extends FormRequest
             'last_name' => 'nullable|string|max:255',
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $userId . ',id',
+            'locale' => ['sometimes', 'required', Rule::in(config('app.supported_locales', ['en']))],
             'phone' => 'nullable|numeric|unique:users,phone,' . $userId . ',id',
             'dob' => 'nullable|date',
             'urls' => 'nullable|array',
