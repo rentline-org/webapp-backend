@@ -3,14 +3,21 @@
 namespace App\Services\Contact;
 
 use App\DTOs\Contact\ContactDTO;
+use App\Enums\ContactAssignmentRole;
+use App\Enums\ContactAssignmentSource;
+use App\Enums\ContactPersonType;
 use App\Models\Contact;
+use App\Models\Organization;
 use App\Models\Property;
+use App\Models\User;
 use App\Repositories\Contracts\ContactRepositoryInterface;
 use App\Services\Organization\ActiveOrganizationContext;
+use App\Services\Organization\AssignedPropertyAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class ContactService
@@ -18,12 +25,18 @@ class ContactService
     public function __construct(
         protected ContactRepositoryInterface $contactRepository,
         protected ActiveOrganizationContext $activeOrganizationContext,
+        protected AssignedPropertyAccess $assignedPropertyAccess,
     ) {}
 
-    public function all(array $filters = []): Collection
+    public function all(array $filters = [], ?User $viewer = null): Collection
     {
+        $organizationId = $this->activeOrganizationId();
+        if ($viewer !== null && $this->assignedPropertyAccess->isRestrictedAgent($viewer, $organizationId)) {
+            $filters['assigned_scope'] = $this->assignedPropertyAccess->scope($viewer, $organizationId);
+        }
+
         return $this->contactRepository->all(
-            $this->activeOrganizationId(),
+            $organizationId,
             $filters
         );
     }
@@ -36,14 +49,18 @@ class ContactService
                 $dto->propertyIds ?? [],
                 $organizationId
             );
+            $this->ensureAgentCanUseProperties($propertyIds, $organizationId);
 
-            return $this->contactRepository->create(
+            $contact = $this->contactRepository->create(
                 [
                     ...$this->contactAttributes($dto),
                     'organization_id' => $organizationId,
                 ],
                 $propertyIds
             );
+            $this->syncManualPropertyAssignments($contact, $propertyIds, $dto->type);
+
+            return $contact->load(['properties', 'assignments.property', 'assignments.unit']);
         });
     }
 
@@ -56,12 +73,20 @@ class ContactService
             $propertyIds = $dto->propertyIds === null
                 ? null
                 : $this->validatedPropertyIds($dto->propertyIds, $organizationId);
+            if ($propertyIds !== null) {
+                $this->ensureAgentCanUseProperties($propertyIds, $organizationId);
+            }
 
-            return $this->contactRepository->update(
+            $updated = $this->contactRepository->update(
                 $contact,
                 $this->contactAttributes($dto),
                 $propertyIds
             );
+            $selectedPropertyIds = $propertyIds
+                ?? $updated->properties()->pluck('properties.id')->map(fn ($id): int => (int) $id)->all();
+            $this->syncManualPropertyAssignments($updated, $selectedPropertyIds, $dto->type);
+
+            return $updated->load(['properties', 'assignments.property', 'assignments.unit']);
         });
     }
 
@@ -148,5 +173,74 @@ class ContactService
         }
 
         return $propertyIds;
+    }
+
+    /** @param list<int> $propertyIds */
+    private function ensureAgentCanUseProperties(array $propertyIds, int $organizationId): void
+    {
+        $user = auth()->user();
+        if ($user === null || ! $this->assignedPropertyAccess->isRestrictedAgent($user, $organizationId)) {
+            return;
+        }
+
+        if ($propertyIds === []) {
+            throw ValidationException::withMessages([
+                'property_ids' => ['Agents must connect a new contact to an assigned property.'],
+            ]);
+        }
+
+        foreach ($propertyIds as $propertyId) {
+            if (! $this->assignedPropertyAccess->canManageProperty($user, $organizationId, $propertyId)) {
+                throw new AuthorizationException('The selected property is not assigned to this agent.');
+            }
+        }
+    }
+
+    /** @param list<int> $propertyIds */
+    private function syncManualPropertyAssignments(
+        Contact $contact,
+        array $propertyIds,
+        ContactPersonType $contactType,
+    ): void {
+        $role = match ($contactType) {
+            ContactPersonType::OWNER => ContactAssignmentRole::OWNER,
+            ContactPersonType::AGENT => ContactAssignmentRole::AGENT,
+            ContactPersonType::TENANT => ContactAssignmentRole::TENANT,
+        };
+        $timezone = Organization::query()->whereKey($contact->organization_id)->value('timezone')
+            ?? config('app.timezone');
+        $today = Carbon::now($timezone)->startOfDay();
+        $activeAssignments = $contact->assignments()
+            ->where('source', ContactAssignmentSource::MANUAL->value)
+            ->whereNull('unit_id')
+            ->whereNull('lease_id')
+            ->where(fn ($query) => $query->whereNull('ends_on')->orWhereDate('ends_on', '>=', $today))
+            ->get();
+
+        foreach ($activeAssignments as $assignment) {
+            if (! in_array($assignment->property_id, $propertyIds, true) || $assignment->role !== $role) {
+                $assignment->update(['ends_on' => $today->copy()->subDay()]);
+            }
+        }
+
+        foreach ($propertyIds as $propertyId) {
+            $existing = $activeAssignments->first(
+                fn ($assignment): bool => $assignment->property_id === $propertyId && $assignment->role === $role
+            );
+            if ($existing !== null) {
+                $existing->update(['ends_on' => null, 'is_primary' => true]);
+
+                continue;
+            }
+
+            $contact->assignments()->create([
+                'organization_id' => $contact->organization_id,
+                'property_id' => $propertyId,
+                'role' => $role,
+                'source' => ContactAssignmentSource::MANUAL,
+                'is_primary' => true,
+                'starts_on' => $today,
+            ]);
+        }
     }
 }

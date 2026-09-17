@@ -39,7 +39,8 @@ class UnitController extends Controller
                 'bathrooms',
                 'include_archived',
             ]),
-            perPage: (int) $request->input('per_page', 15)
+            perPage: (int) $request->input('per_page', 15),
+            viewer: $request->user(),
         );
 
         return UnitResource::collection($units);
@@ -64,9 +65,15 @@ class UnitController extends Controller
         Gate::authorize('view', $property);
 
         $this->ensureUnitBelongsToProperty($property, $unit);
+        Gate::authorize('view', $unit);
 
         return new UnitResource(
-            $unit->load(['property', 'leases', 'contactAssignments.contact'])
+            $unit->load([
+                'property.organization:id,timezone',
+                'property.contactAssignments.contact',
+                'leases.organization:id,timezone',
+                'contactAssignments.contact',
+            ])
         );
     }
 
@@ -76,9 +83,10 @@ class UnitController extends Controller
         UnitUpdateRequest $request,
         Unit $unit
     ) {
-        Gate::authorize('update', $property);
+        Gate::authorize('view', $property);
 
         $this->ensureUnitBelongsToProperty($property, $unit);
+        Gate::authorize('update', $unit);
 
         $updated = $this->unitService->update(
             $unit,
@@ -91,9 +99,10 @@ class UnitController extends Controller
     /** Delete a unit */
     public function destroy(Property $property, Unit $unit)
     {
-        Gate::authorize('update', $property);
+        Gate::authorize('view', $property);
 
         $this->ensureUnitBelongsToProperty($property, $unit);
+        Gate::authorize('delete', $unit);
 
         $this->unitService->delete($unit);
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Document;
 
+use App\Enums\OrganizationMemberStatus;
 use App\Models\Document;
 use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Foundation\Http\FormRequest;
@@ -23,7 +24,9 @@ class StoreDocumentShareRequest extends FormRequest
         return [
             'user_id' => [
                 'required', 'integer',
-                Rule::exists('organization_user', 'user_id')->where('organization_id', $organizationId),
+                Rule::exists('organization_user', 'user_id')->where(fn ($query) => $query
+                    ->where('organization_id', $organizationId)
+                    ->where('status', OrganizationMemberStatus::ACTIVE->value)),
             ],
             'contact_id' => [
                 'sometimes', 'nullable', 'integer',

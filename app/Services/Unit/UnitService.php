@@ -7,27 +7,36 @@ use App\Enums\PropertyType;
 use App\Enums\UnitType;
 use App\Models\Property;
 use App\Models\Unit;
+use App\Models\User;
 use App\Repositories\Contracts\UnitRepositoryInterface;
+use App\Services\Organization\AssignedPropertyAccess;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use InvalidArgumentException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class UnitService
 {
     public function __construct(
-        protected UnitRepositoryInterface $unitRepository
+        protected UnitRepositoryInterface $unitRepository,
+        protected AssignedPropertyAccess $assignedPropertyAccess,
     ) {}
 
     public function paginate(
         Property $property,
         array $filters = [],
-        int $perPage = 15
+        int $perPage = 15,
+        ?User $viewer = null,
     ): LengthAwarePaginator {
+        $filters = $this->withAssignedUnitScope($property, $filters, $viewer);
+
         return $this->unitRepository->paginateByProperty($property, $filters, $perPage);
     }
 
-    public function all(Property $property, array $filters = []): Collection
+    public function all(Property $property, array $filters = [], ?User $viewer = null): Collection
     {
+        $filters = $this->withAssignedUnitScope($property, $filters, $viewer);
+
         return $this->unitRepository->allByProperty($property, $filters);
     }
 
@@ -39,6 +48,10 @@ class UnitService
     /** Create a new unit under a property. */
     public function create(Property $property, UnitDTO $dto): Unit
     {
+        if ($property->archived_at !== null) {
+            throw new ConflictHttpException('Units cannot be added to an archived property.');
+        }
+
         $this->ensureValidUnitType($property, $dto->unit_type);
 
         return $this->unitRepository->create(
@@ -50,6 +63,10 @@ class UnitService
     /** Update a unit. */
     public function update(Unit $unit, UnitDTO $dto): Unit
     {
+        if ($unit->archived_at !== null || $unit->property?->archived_at !== null) {
+            throw new ConflictHttpException('Archived units cannot be edited.');
+        }
+
         $this->ensureValidUnitType($unit->property, $dto->unit_type);
 
         return $this->unitRepository->update(
@@ -60,6 +77,17 @@ class UnitService
 
     public function delete(Unit $unit): bool
     {
+        $unit->loadMissing('property');
+
+        if ($unit->archived_at !== null) {
+            return true;
+        }
+
+        if ($unit->property?->archived_at === null
+            && $unit->property?->units()->whereNull('archived_at')->count() <= 1) {
+            throw new ConflictHttpException('Archive the property instead of its last rentable unit.');
+        }
+
         return $unit->update([
             'operational_status' => 'off_market',
             'archived_at' => now(),
@@ -81,25 +109,24 @@ class UnitService
     /** Define allowed unit types per property type. */
     protected function allowedUnitTypes(PropertyType $propertyType): array
     {
-        return match ($propertyType) {
-            PropertyType::SINGLE_UNIT => [
-                UnitType::HOUSE,
-                UnitType::ROOM,
-                UnitType::OFFICE,
-                UnitType::STUDIO,
-                UnitType::WAREHOUSE,
-            ],
+        return $propertyType->allowedUnitTypes();
+    }
 
-            PropertyType::MULTI_UNIT => [
-                UnitType::APARTMENT,
-                UnitType::STUDIO,
-                UnitType::ROOM,
-                UnitType::OFFICE,
-            ],
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function withAssignedUnitScope(Property $property, array $filters, ?User $viewer): array
+    {
+        if ($viewer === null || ! $this->assignedPropertyAccess->isRestrictedAgent($viewer, $property->organization_id)) {
+            return $filters;
+        }
 
-            PropertyType::LAND => [
-                UnitType::LAND,
-            ],
-        };
+        $scope = $this->assignedPropertyAccess->scope($viewer, $property->organization_id);
+        if (! in_array($property->id, $scope['broad_property_ids'], true)) {
+            $filters['assigned_unit_ids'] = $scope['unit_ids'];
+        }
+
+        return $filters;
     }
 }

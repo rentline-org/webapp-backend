@@ -53,19 +53,36 @@ class UnitRepository implements UnitRepositoryInterface
 
     protected function query(Property $property, array $filters = [])
     {
-        $query = $property->units()->with(['leases', 'contactAssignments.contact']);
+        $query = $property->units()->with([
+            'leases.organization:id,timezone',
+            'contactAssignments.contact',
+            'property.organization:id,timezone',
+            'property.contactAssignments.contact',
+        ]);
 
         if (empty($filters['include_archived'])) {
             $query->whereNull('archived_at');
         }
 
+        if (array_key_exists('assigned_unit_ids', $filters)) {
+            $query->whereIn('units.id', $filters['assigned_unit_ids']);
+        }
+
         if (array_key_exists('is_available', $filters) && $filters['is_available'] !== null) {
             $available = filter_var($filters['is_available'], FILTER_VALIDATE_BOOL);
-            $query->where('operational_status', 'active');
-            $method = $available ? 'whereDoesntHave' : 'whereHas';
-            $query->{$method}('leases', fn (Builder $leaseQuery) => $leaseQuery
-                ->where('workflow_status', 'active')
-                ->whereDate('ends_on', '>=', today()));
+            if ($available) {
+                $query->where('operational_status', 'active')
+                    ->whereDoesntHave('leases', fn (Builder $leaseQuery) => $leaseQuery
+                        ->where('workflow_status', 'active')
+                        ->whereDate('ends_on', '>=', today()));
+            } else {
+                $query->where(function (Builder $query): void {
+                    $query->where('operational_status', '!=', 'active')
+                        ->orWhereHas('leases', fn (Builder $leaseQuery) => $leaseQuery
+                            ->where('workflow_status', 'active')
+                            ->whereDate('ends_on', '>=', today()));
+                });
+            }
         }
 
         if (! empty($filters['min_rent_price'])) {

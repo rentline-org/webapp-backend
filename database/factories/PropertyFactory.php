@@ -34,23 +34,6 @@ class PropertyFactory extends Factory
                 array_map(fn ($c) => $c->value, PropertyType::cases())
             ),
 
-            'is_available' => true,
-            'is_furnished' => $this->faker->boolean(),
-
-            'rent_price' => $this->faker->optional()->randomFloat(2, 500, 8000),
-            'sale_price' => $this->faker->optional()->randomFloat(2, 100000, 900000),
-            'buy_price' => $this->faker->optional()->randomFloat(2, 100000, 900000),
-
-            'bedrooms' => $this->faker->numberBetween(1, 5),
-            'bathrooms' => $this->faker->numberBetween(1, 3),
-            'square_feet' => $this->faker->randomFloat(2, 40, 300),
-
-            'amenities' => ['wifi', 'parking'],
-            'available_from' => now(),
-
-            'is_pet_friendly' => $this->faker->boolean(),
-
-            'sale_types' => ['rent'],
         ];
     }
 

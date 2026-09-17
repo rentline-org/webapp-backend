@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Lease;
 use App\Models\User;
 use App\Services\Organization\ActiveOrganizationContext;
+use App\Services\Organization\AssignedPropertyAccess;
 
 class LeasePolicy
 {
@@ -26,7 +27,7 @@ class LeasePolicy
         }
 
         if ($this->canOperate($user)) {
-            return true;
+            return app(AssignedPropertyAccess::class)->canAccessLease($user, $lease);
         }
 
         return $lease->parties()
@@ -47,7 +48,9 @@ class LeasePolicy
      */
     public function update(User $user, Lease $lease): bool
     {
-        return $lease->organization_id === $this->organizationId() && $this->canOperate($user);
+        return $lease->organization_id === $this->organizationId()
+            && $this->canOperate($user)
+            && app(AssignedPropertyAccess::class)->canAccessLease($user, $lease);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Document;
 
 use App\Models\Document;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreDocumentVersionRequest extends FormRequest
 {
@@ -34,5 +35,22 @@ class StoreDocumentVersionRequest extends FormRequest
             'supporting_party_visible.*' => ['boolean'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
         ];
+    }
+
+    /** @return array<int, callable(Validator): void> */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            $supportingFileCount = count($this->file('supporting_files', []));
+            foreach (['supporting_labels', 'supporting_party_visible'] as $field) {
+                if (count($this->input($field, [])) > $supportingFileCount) {
+                    $validator->errors()->add($field, 'Supporting file metadata must match an uploaded file.');
+                }
+            }
+        }];
     }
 }

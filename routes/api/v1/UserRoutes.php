@@ -15,6 +15,7 @@ Route::group(['prefix' => 'v1', 'middleware' => ['auth:sanctum']], function () {
     Route::post('/user/change-password', [UserController::class, 'changePassword']);
     Route::post('/user/profile/update-avatar', [UserController::class, 'updateProfileAvatar']);
     Route::post('/user/profile/update', [UserController::class, 'updateProfile']);
+    Route::patch('/user/profile/locale', [UserController::class, 'updateLocale']);
     Route::post('/user/profile/change-password', [UserController::class, 'changeProfilePassword']);
     Route::post('/user/export', action: [UserController::class, 'exportUserData']);
     Route::post('/user/export-background', [UserController::class, 'exportUsersBackground']);

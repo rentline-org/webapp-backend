@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Enums\DocumentLifecycle;
 use App\Enums\DocumentType;
 use App\Enums\MediaCollection;
+use App\Enums\OrganizationMemberStatus;
 use App\Models\Scopes\OrganizationScope;
 use App\Services\Organization\ActiveOrganizationContext;
+use Database\Factories\DocumentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,7 +20,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 class Document extends Model implements HasMedia
 {
-    /** @use HasFactory<\Database\Factories\DocumentFactory> */
+    /** @use HasFactory<DocumentFactory> */
     use HasFactory, InteractsWithMedia;
 
     protected $fillable = [
@@ -44,22 +46,6 @@ class Document extends Model implements HasMedia
         'signed_at',
         'archived_at',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'type' => DocumentType::class,
-            'lifecycle' => DocumentLifecycle::class,
-            'issued_on' => 'date',
-            'effective_on' => 'date',
-            'expires_on' => 'date',
-            'metadata' => 'array',
-            'requires_signature' => 'boolean',
-            'is_signed' => 'boolean',
-            'signed_at' => 'datetime',
-            'archived_at' => 'datetime',
-        ];
-    }
 
     public function organization(): BelongsTo
     {
@@ -205,7 +191,10 @@ class Document extends Model implements HasMedia
             $organizationId === null
             || $organizationId < 1
             || $user === null
-            || ! $user->organizations()->whereKey($organizationId)->exists()
+            || (! $user->isSuperAdmin() && ! $user->organizations()
+                ->whereKey($organizationId)
+                ->wherePivot('status', OrganizationMemberStatus::ACTIVE->value)
+                ->exists())
         ) {
             return $query->whereRaw('1 = 0');
         }
@@ -219,5 +208,21 @@ class Document extends Model implements HasMedia
     protected static function booted(): void
     {
         static::addGlobalScope(new OrganizationScope);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'type' => DocumentType::class,
+            'lifecycle' => DocumentLifecycle::class,
+            'issued_on' => 'date',
+            'effective_on' => 'date',
+            'expires_on' => 'date',
+            'metadata' => 'array',
+            'requires_signature' => 'boolean',
+            'is_signed' => 'boolean',
+            'signed_at' => 'datetime',
+            'archived_at' => 'datetime',
+        ];
     }
 }

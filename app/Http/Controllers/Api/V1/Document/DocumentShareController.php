@@ -30,6 +30,7 @@ class DocumentShareController extends Controller
     public function destroy(Request $request, Document $document, DocumentShare $share): DocumentResource
     {
         Gate::authorize('update', $document);
+        abort_unless($share->document_id === $document->id, 404);
 
         return DocumentResource::make($this->documentService->revokeShare(
             $document,

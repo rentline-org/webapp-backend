@@ -7,6 +7,7 @@ use App\Exceptions\ApiException;
 use App\Models\Role;
 use App\Repositories\Contracts\RoleRepositoryInterface;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 
 class RoleService
@@ -25,7 +26,7 @@ class RoleService
             $role = $this->roleRepository->create(['name' => $name]);
 
             if (! empty($permissions)) {
-                app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+                app()[PermissionRegistrar::class]->forgetCachedPermissions();
                 $role->givePermissionTo($permissions);
             }
             DB::commit();
@@ -49,7 +50,7 @@ class RoleService
     public function deleteRole(Role $role): void
     {
         $this->checkAndSendUnalterableRoleError($role->id);
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         DB::beginTransaction();
         try {
@@ -71,8 +72,8 @@ class RoleService
     {
         return [
             UserRole::SUPER_ADMIN->id(),
-            UserRole::ADMIN->id(),
-            UserRole::USER->id(),
+            UserRole::LANDLORD->id(),
+            UserRole::TENANT->id(),
         ];
     }
 

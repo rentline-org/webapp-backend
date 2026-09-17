@@ -7,6 +7,7 @@ use App\Enums\DocumentLifecycle;
 use App\Enums\DocumentSignerStatus;
 use App\Enums\DocumentType;
 use App\Enums\MediaCollection;
+use App\Enums\OrganizationMemberStatus;
 use App\Models\Contact;
 use App\Models\Document;
 use App\Models\DocumentAuditEvent;
@@ -22,6 +23,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Repositories\Contracts\DocumentRepositoryInterface;
 use App\Services\Organization\ActiveOrganizationContext;
+use App\Services\Organization\AssignedPropertyAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
@@ -37,12 +39,21 @@ class DocumentService
     public function __construct(
         protected DocumentRepositoryInterface $documentRepository,
         protected ActiveOrganizationContext $activeOrganizationContext,
+        protected DocumentKindCatalog $kindCatalog,
+        protected AssignedPropertyAccess $assignedPropertyAccess,
     ) {}
 
-    public function all(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function all(array $filters = [], int $perPage = 15, ?User $viewer = null): LengthAwarePaginator
     {
+        $organizationId = $this->activeOrganizationId();
+        if ($viewer !== null && ! $viewer->canOperateActiveOrganization()) {
+            $filters['shared_with_user_id'] = $viewer->id;
+        } elseif ($viewer !== null && $this->assignedPropertyAccess->isRestrictedAgent($viewer, $organizationId)) {
+            $filters['assigned_scope'] = $this->assignedPropertyAccess->scope($viewer, $organizationId);
+        }
+
         return $this->documentRepository->paginate(
-            $this->activeOrganizationId(),
+            $organizationId,
             $filters,
             min(max($perPage, 1), 100),
         );
@@ -77,6 +88,15 @@ class DocumentService
 
                 $this->ensureSignatureStateIsValid($requiresSignature, $isSigned, $dto->signedFile !== null);
                 $this->validateContexts($dto, $attributes, $organizationId);
+                $this->validateKindConfiguration($type, $customKind, $dto, $attributes);
+                if (($attributes['lifecycle'] ?? DocumentLifecycle::DRAFT->value) === DocumentLifecycle::ACTIVE->value) {
+                    $this->validateOperationalReadiness(
+                        $this->kindCatalog->payloadFor($type, $customKind),
+                        $dto->parties,
+                        count($dto->signers),
+                        $requiresSignature,
+                    );
+                }
 
                 $legacyLeaseAttributes = $this->legacyLeaseAttributes($dto, $attributes, $organizationId);
                 $document = $this->documentRepository->create([
@@ -92,7 +112,7 @@ class DocumentService
                     'signed_at' => $isSigned ? now() : null,
                 ], $legacyLeaseAttributes);
 
-                $this->syncContexts($document, $dto, $attributes);
+                $this->syncContexts($document, $dto, $attributes, creating: true);
                 $this->syncParties($document, $dto->parties, $organizationId);
 
                 $version = $document->versions()->create([
@@ -187,6 +207,16 @@ class DocumentService
 
             $attributes = $this->normalizedPrimaryContext($dto, $organizationId, $lockedDocument);
             $this->validateContexts($dto, $attributes, $organizationId, $lockedDocument);
+            $this->validateKindConfiguration(
+                $lockedDocument->type,
+                $lockedDocument->customKind,
+                $dto,
+                $attributes,
+                $lockedDocument,
+            );
+
+            $previousPropertyId = $lockedDocument->property_id;
+            $previousUnitId = $lockedDocument->unit_id;
 
             unset($attributes['type'], $attributes['is_signed'], $attributes['lifecycle']);
 
@@ -197,7 +227,13 @@ class DocumentService
             $lockedDocument->update($attributes);
 
             if ($dto->hasContexts || $dto->hasAttribute('property_id') || $dto->hasAttribute('unit_id')) {
-                $this->syncContexts($lockedDocument, $dto, $attributes);
+                $this->syncContexts(
+                    $lockedDocument,
+                    $dto,
+                    $attributes,
+                    previousPropertyId: $previousPropertyId,
+                    previousUnitId: $previousUnitId,
+                );
             }
 
             if ($dto->hasParties) {
@@ -219,9 +255,9 @@ class DocumentService
     }
 
     /**
-     * @param  list<UploadedFile>  $supportingFiles
-     * @param  list<string|null>  $supportingLabels
-     * @param  list<bool>  $supportingPartyVisibility
+     * @param list<UploadedFile> $supportingFiles
+     * @param list<string|null>  $supportingLabels
+     * @param list<bool>         $supportingPartyVisibility
      */
     public function createVersion(
         Document $document,
@@ -248,13 +284,18 @@ class DocumentService
                     throw new ConflictHttpException('Archived documents cannot receive new versions.');
                 }
 
+                if ($signedFile !== null && ! $lockedDocument->requires_signature) {
+                    throw ValidationException::withMessages([
+                        'signed_file' => ['This document does not require a signature.'],
+                    ]);
+                }
+
                 $previousVersion = $this->ensureCurrentVersion($lockedDocument, $actorId);
                 $nextNumber = ((int) $lockedDocument->versions()->max('version_number')) + 1;
                 $version = $lockedDocument->versions()->create([
                     'version_number' => $nextNumber,
                     'created_by' => $actorId,
                     'notes' => $notes,
-                    'finalized_at' => $signedFile !== null ? now() : null,
                 ]);
 
                 $primaryMedia = $this->addPrivateMedia(
@@ -298,20 +339,22 @@ class DocumentService
                         'name_snapshot' => $signer->name_snapshot,
                         'email_snapshot' => $signer->email_snapshot,
                         'role' => $signer->role,
-                        'status' => $signedFile === null
-                            ? DocumentSignerStatus::PENDING
-                            : DocumentSignerStatus::SIGNED,
-                        'signed_at' => $signedFile === null ? null : now(),
-                        'acted_by' => $signedFile === null ? null : $actorId,
+                        'status' => DocumentSignerStatus::PENDING,
+                        'signed_at' => null,
+                        'acted_by' => null,
                     ]);
                 }
 
                 $lockedDocument->update([
                     'lifecycle' => DocumentLifecycle::DRAFT,
-                    'is_signed' => $signedFile !== null,
-                    'signed_at' => $signedFile !== null ? now() : null,
-                    'signed_by' => $signedFile !== null ? $actorId : null,
+                    'is_signed' => false,
+                    'signed_at' => null,
+                    'signed_by' => null,
                 ]);
+
+                if ($signedFile !== null) {
+                    $this->recalculateSignatureState($lockedDocument, $version, $actorId);
+                }
 
                 $this->audit($lockedDocument, 'document.version_created', $actorId, [
                     'version' => $nextNumber,
@@ -335,6 +378,10 @@ class DocumentService
             return DB::transaction(function () use ($document, $signedFile, $signedBy, &$createdMedia): Document {
                 $lockedDocument = $this->lockDocument($document);
 
+                if ($lockedDocument->lifecycle === DocumentLifecycle::ARCHIVED) {
+                    throw new ConflictHttpException('Archived documents cannot receive signed files.');
+                }
+
                 if (! $lockedDocument->requires_signature) {
                     throw ValidationException::withMessages(['signed_file' => ['This document does not require a signature.']]);
                 }
@@ -352,7 +399,7 @@ class DocumentService
                     $version,
                 );
                 $createdMedia[] = $signedMedia;
-                $version->update(['signed_media_id' => $signedMedia->id, 'finalized_at' => now()]);
+                $version->update(['signed_media_id' => $signedMedia->id]);
                 $this->recalculateSignatureState($lockedDocument, $version, $signedBy);
                 $this->audit($lockedDocument, 'document.signed_file_uploaded', $signedBy, [
                     'version' => $version->version_number,
@@ -372,22 +419,11 @@ class DocumentService
     {
         return DB::transaction(function () use ($document, $actorId): Document {
             $lockedDocument = $this->lockDocument($document);
-            if ($lockedDocument->lifecycle !== DocumentLifecycle::DRAFT) {
-                throw new ConflictHttpException('Signed files on active documents are immutable.');
-            }
-
             $version = $this->ensureCurrentVersion($lockedDocument, $actorId);
-            if ($version->signedMedia !== null) {
-                $version->signedMedia->delete();
+
+            if ($version->signed_media_id !== null || $lockedDocument->is_signed) {
+                throw new ConflictHttpException('Signed files are immutable. Create a new document revision instead.');
             }
-            $version->update(['signed_media_id' => null, 'finalized_at' => null]);
-            $version->signers()->update([
-                'status' => DocumentSignerStatus::PENDING->value,
-                'signed_at' => null,
-                'acted_by' => null,
-            ]);
-            $lockedDocument->update(['is_signed' => false, 'signed_at' => null, 'signed_by' => null]);
-            $this->audit($lockedDocument, 'document.signed_file_removed', $actorId, ['version' => $version->version_number]);
 
             return $this->documentRepository->load($lockedDocument->refresh());
         });
@@ -417,6 +453,10 @@ class DocumentService
         return DB::transaction(function () use ($document, $signer, $status, $actorId): Document {
             $lockedDocument = $this->lockDocument($document);
             $version = $this->ensureCurrentVersion($lockedDocument, $actorId);
+
+            if ($lockedDocument->lifecycle === DocumentLifecycle::ARCHIVED || $lockedDocument->is_signed) {
+                throw new ConflictHttpException('Completed or archived signature records are immutable.');
+            }
 
             if ($signer->document_id !== $lockedDocument->id || $signer->document_version_id !== $version->id) {
                 throw new AuthorizationException;
@@ -463,7 +503,9 @@ class DocumentService
             $organizationId = $lockedDocument->organization_id;
             $user = User::query()
                 ->whereKey($userId)
-                ->whereHas('organizations', fn ($query) => $query->whereKey($organizationId))
+                ->whereHas('organizations', fn ($query) => $query
+                    ->whereKey($organizationId)
+                    ->where('organization_user.status', OrganizationMemberStatus::ACTIVE->value))
                 ->first();
 
             if ($user === null) {
@@ -482,7 +524,7 @@ class DocumentService
                     ->whereHas('documentParties', fn ($query) => $query->where('document_id', $lockedDocument->id))
                     ->first();
 
-            if ($partyContact === null || ($partyContact->user_id !== null && $partyContact->user_id !== $userId)) {
+            if ($partyContact === null || $partyContact->user_id !== $userId) {
                 throw ValidationException::withMessages(['contact_id' => ['Shares can only be granted to a linked document party.']]);
             }
 
@@ -534,14 +576,60 @@ class DocumentService
         });
     }
 
+    public function activate(Document $document, int $actorId): Document
+    {
+        return DB::transaction(function () use ($document, $actorId): Document {
+            $lockedDocument = $this->lockDocument($document);
+
+            if ($lockedDocument->lifecycle !== DocumentLifecycle::DRAFT) {
+                throw new ConflictHttpException('Only a draft document can be activated.');
+            }
+
+            $version = $this->ensureCurrentVersion($lockedDocument, $actorId);
+            $profile = $this->kindCatalog->payloadFor(
+                $lockedDocument->type,
+                $lockedDocument->customKind,
+            );
+            $this->validateOperationalReadiness(
+                $profile,
+                $lockedDocument->parties()->get(['role'])->map(fn ($party): array => [
+                    'role' => $party->role,
+                ])->all(),
+                $version->signers()->count(),
+                $lockedDocument->requires_signature,
+            );
+
+            if ($version->primary_media_id === null) {
+                throw ValidationException::withMessages([
+                    'file' => ['Upload a primary document before activation.'],
+                ]);
+            }
+
+            $lockedDocument->update([
+                'lifecycle' => DocumentLifecycle::ACTIVE,
+                'archived_at' => null,
+            ]);
+
+            if ($lockedDocument->supersedes_document_id !== null) {
+                Document::withoutGlobalScopes()
+                    ->where('organization_id', $lockedDocument->organization_id)
+                    ->whereKey($lockedDocument->supersedes_document_id)
+                    ->where('lifecycle', DocumentLifecycle::ACTIVE->value)
+                    ->update(['lifecycle' => DocumentLifecycle::SUPERSEDED->value]);
+            }
+
+            $this->audit($lockedDocument, 'document.activated', $actorId);
+
+            return $this->documentRepository->load($lockedDocument->refresh());
+        });
+    }
+
     public function delete(Document $document, ?int $actorId = null): bool
     {
         $this->ensureDocumentBelongsToOrganization($document, $this->activeOrganizationId());
 
         if ($document->lifecycle !== DocumentLifecycle::DRAFT || $document->is_signed) {
-            $this->archive($document, $actorId ?? (int) auth()->id());
-
-            return true;
+            throw new ConflictHttpException('Only unsigned draft documents can be deleted. Archive this document instead.');
         }
 
         $this->audit($document, 'document.deleted', $actorId);
@@ -665,25 +753,206 @@ class DocumentService
         if ($primaryUnitId !== null && ! Unit::query()->whereKey($primaryUnitId)->where('property_id', $primaryPropertyId)->exists()) {
             throw ValidationException::withMessages(['unit_id' => ['The selected unit must belong to the selected property.']]);
         }
+
+        $user = auth()->user();
+        if ($user !== null && $this->assignedPropertyAccess->isRestrictedAgent($user, $organizationId)) {
+            foreach ($propertyIds as $propertyId) {
+                if (! $this->assignedPropertyAccess->canAccessProperty($user, $organizationId, (int) $propertyId)) {
+                    throw new AuthorizationException('The selected property is not assigned to this agent.');
+                }
+            }
+            foreach ($unitIds as $unitId) {
+                if (! $this->assignedPropertyAccess->canAccessUnit($user, $organizationId, (int) $unitId)) {
+                    throw new AuthorizationException('The selected unit is not assigned to this agent.');
+                }
+            }
+            foreach (Lease::withoutGlobalScopes()->whereIn('id', $leaseIds)->get() as $lease) {
+                if (! $this->assignedPropertyAccess->canAccessLease($user, $lease)) {
+                    throw new AuthorizationException('The selected lease is not assigned to this agent.');
+                }
+            }
+            if ($propertyIds === [] && $unitIds === [] && $leaseIds === []) {
+                throw new AuthorizationException('Agents must connect documents to an assigned property, unit, or lease.');
+            }
+        }
     }
 
     /** @param array<string, mixed> $attributes */
-    private function syncContexts(Document $document, DocumentDTO $dto, array $attributes): void
-    {
-        $propertyIds = array_values(array_unique(array_filter([...$dto->propertyIds, $attributes['property_id'] ?? $document->property_id])));
-        $unitIds = array_values(array_unique(array_filter([...$dto->unitIds, $attributes['unit_id'] ?? $document->unit_id])));
-        $unitPropertyIds = Unit::query()->whereIn('id', $unitIds)->pluck('property_id')->all();
+    private function validateKindConfiguration(
+        DocumentType $type,
+        ?DocumentKind $customKind,
+        DocumentDTO $dto,
+        array $attributes,
+        ?Document $document = null,
+    ): void {
+        if ($type === DocumentType::CUSTOM && $customKind === null) {
+            throw ValidationException::withMessages([
+                'document_kind_id' => ['The selected custom document kind is unavailable.'],
+            ]);
+        }
+
+        $profile = $this->kindCatalog->payloadFor($type, $customKind);
+        $hasRequestedUnitScope = $dto->unitIds !== []
+            || ($dto->hasAttribute('unit_id') && ($attributes['unit_id'] ?? null) !== null);
+        $requestedScopes = [];
+
+        if ($dto->leaseLinks !== [] || $dto->leaseAttributes !== null) {
+            $requestedScopes[] = 'lease';
+        }
+        if ($hasRequestedUnitScope) {
+            $requestedScopes[] = 'unit';
+        }
+        if (
+            $dto->propertyIds !== []
+            || ($dto->hasAttribute('property_id')
+                && ($attributes['property_id'] ?? null) !== null
+                && ! $hasRequestedUnitScope)
+        ) {
+            $requestedScopes[] = 'property';
+        }
+
+        $unsupportedScopes = array_values(array_diff(array_unique($requestedScopes), $profile['allowed_scopes']));
+        if ($unsupportedScopes !== []) {
+            throw ValidationException::withMessages([
+                'context' => ['This document kind does not support: ' . implode(', ', $unsupportedScopes) . '.'],
+            ]);
+        }
+
+        $hasEffectiveContext = $requestedScopes !== []
+            || ($document !== null && (
+                $document->property_id !== null
+                || $document->unit_id !== null
+                || $document->properties()->exists()
+                || $document->units()->exists()
+                || $document->leases()->exists()
+                || $document->lease()->exists()
+            ));
+
+        if (! $hasEffectiveContext && ! in_array('organization', $profile['allowed_scopes'], true)) {
+            throw ValidationException::withMessages([
+                'context' => ['Select a property, unit, or lease supported by this document kind.'],
+            ]);
+        }
+
+        if (
+            $dto->hasAttribute('expires_on')
+            && ($attributes['expires_on'] ?? null) !== null
+            && ! $profile['supports_expiry']
+        ) {
+            throw ValidationException::withMessages([
+                'expires_on' => ['This document kind does not support expiry dates.'],
+            ]);
+        }
+
+        if (
+            in_array($type, [DocumentType::GENERIC, DocumentType::CUSTOM], true)
+            && $dto->hasAttribute('metadata')
+            && ($attributes['metadata'] ?? []) !== []
+        ) {
+            throw ValidationException::withMessages([
+                'details' => ['Structured details are not available for generic document kinds.'],
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed>       $profile
+     * @param list<array<string, mixed>> $parties
+     */
+    private function validateOperationalReadiness(
+        array $profile,
+        array $parties,
+        int $signerCount,
+        bool $requiresSignature,
+    ): void {
+        $requiredRoles = $profile['required_parties'] ?? [];
+        $partyRoles = array_values(array_unique(array_filter(
+            Arr::pluck($parties, 'role'),
+            fn (mixed $role): bool => is_string($role) && $role !== '',
+        )));
+        $missingRoles = array_values(array_diff($requiredRoles, $partyRoles));
+
+        if ($missingRoles !== []) {
+            throw ValidationException::withMessages([
+                'parties' => ['Add the required document parties: ' . implode(', ', $missingRoles) . '.'],
+            ]);
+        }
+
+        if ($requiresSignature && $signerCount < 1) {
+            throw ValidationException::withMessages([
+                'signers' => ['Add at least one required signer before activation.'],
+            ]);
+        }
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function syncContexts(
+        Document $document,
+        DocumentDTO $dto,
+        array $attributes,
+        bool $creating = false,
+        ?int $previousPropertyId = null,
+        ?int $previousUnitId = null,
+    ): void {
+        $unitsChanged = $creating || $dto->hasUnitIds || $dto->hasAttribute('unit_id');
+        $propertiesChanged = $creating
+            || $dto->hasPropertyIds
+            || $dto->hasAttribute('property_id')
+            || $unitsChanged;
+
+        $unitIds = $creating
+            ? []
+            : $document->units()->pluck('units.id')->map(fn ($id): int => (int) $id)->all();
+        if ($dto->hasUnitIds) {
+            $unitIds = $dto->unitIds;
+        }
+        if ($dto->hasAttribute('unit_id') || $creating) {
+            $unitIds = array_values(array_filter(
+                $unitIds,
+                fn (int $id): bool => $id !== $previousUnitId,
+            ));
+            if (($attributes['unit_id'] ?? $document->unit_id) !== null) {
+                $unitIds[] = (int) ($attributes['unit_id'] ?? $document->unit_id);
+            }
+        }
+        $unitIds = array_values(array_unique($unitIds));
+
+        $propertyIds = $creating
+            ? []
+            : $document->properties()->pluck('properties.id')->map(fn ($id): int => (int) $id)->all();
+        if ($dto->hasPropertyIds) {
+            $propertyIds = $dto->propertyIds;
+        }
+        if ($dto->hasAttribute('property_id') || $creating) {
+            $propertyIds = array_values(array_filter(
+                $propertyIds,
+                fn (int $id): bool => $id !== $previousPropertyId,
+            ));
+            if (($attributes['property_id'] ?? $document->property_id) !== null) {
+                $propertyIds[] = (int) ($attributes['property_id'] ?? $document->property_id);
+            }
+        }
+
+        $unitPropertyIds = Unit::query()->whereIn('id', $unitIds)->pluck('property_id')->map(
+            fn ($id): int => (int) $id,
+        )->all();
         $propertyIds = array_values(array_unique([...$propertyIds, ...$unitPropertyIds]));
 
-        $document->properties()->sync(collect($propertyIds)->mapWithKeys(
-            fn (int $id): array => [$id => ['relation_type' => 'applies_to']]
-        )->all());
-        $document->units()->sync(collect($unitIds)->mapWithKeys(
-            fn (int $id): array => [$id => ['relation_type' => 'applies_to']]
-        )->all());
-        $document->leases()->sync(collect($dto->leaseLinks)->mapWithKeys(
-            fn (array $link): array => [(int) $link['lease_id'] => ['relation_type' => $link['relation_type'] ?? 'supporting']]
-        )->all());
+        if ($propertiesChanged) {
+            $document->properties()->sync(collect($propertyIds)->mapWithKeys(
+                fn (int $id): array => [$id => ['relation_type' => 'applies_to']]
+            )->all());
+        }
+        if ($unitsChanged) {
+            $document->units()->sync(collect($unitIds)->mapWithKeys(
+                fn (int $id): array => [$id => ['relation_type' => 'applies_to']]
+            )->all());
+        }
+        if ($creating || $dto->hasLeaseLinks) {
+            $document->leases()->sync(collect($dto->leaseLinks)->mapWithKeys(
+                fn (array $link): array => [(int) $link['lease_id'] => ['relation_type' => $link['relation_type'] ?? 'supporting']]
+            )->all());
+        }
     }
 
     /** @param list<array<string, mixed>> $parties */
@@ -796,6 +1065,9 @@ class DocumentService
             ->whereNotIn('status', [DocumentSignerStatus::SIGNED->value, DocumentSignerStatus::WAIVED->value])
             ->exists();
         $complete = $version->signed_media_id !== null && ! $hasIncompleteSigners;
+        $version->update([
+            'finalized_at' => $complete ? ($version->finalized_at ?? now()) : null,
+        ]);
         $document->update([
             'is_signed' => $complete,
             'signed_at' => $complete ? now() : null,
@@ -835,7 +1107,7 @@ class DocumentService
 
         return $document->addMedia($file)
             ->usingName($label ?: pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME))
-            ->usingFileName(Str::uuid().'.'.$extension)
+            ->usingFileName(Str::uuid() . '.' . $extension)
             ->withCustomProperties([
                 'original_name' => $file->getClientOriginalName(),
                 'sha256' => hash_file('sha256', $file->getRealPath()),

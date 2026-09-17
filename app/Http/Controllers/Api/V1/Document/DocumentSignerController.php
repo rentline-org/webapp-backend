@@ -31,6 +31,7 @@ class DocumentSignerController extends Controller
     public function update(UpdateDocumentSignerRequest $request, Document $document, DocumentSigner $signer): DocumentResource
     {
         Gate::authorize('update', $document);
+        abort_unless($signer->document_id === $document->id, 404);
 
         return DocumentResource::make($this->documentService->updateSigner(
             $document,
@@ -43,6 +44,7 @@ class DocumentSignerController extends Controller
     public function destroy(Request $request, Document $document, DocumentSigner $signer): DocumentResource
     {
         Gate::authorize('update', $document);
+        abort_unless($signer->document_id === $document->id, 404);
 
         return DocumentResource::make($this->documentService->removeSigner(
             $document,

@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Property;
 
-use App\Enums\PropertyType;
 use App\Enums\PropertyOperationalStatus;
+use App\Enums\PropertyType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -86,6 +86,24 @@ class PropertyInsertRequest extends FormRequest
                     $validator->errors()->add(
                         'units',
                         'Land properties must contain exactly one unit.'
+                    );
+                }
+            }
+
+            $propertyType = PropertyType::tryFrom((string) $type);
+            if ($propertyType === null) {
+                return;
+            }
+
+            foreach ($units as $index => $unit) {
+                if (! is_array($unit) || ! isset($unit['unit_type'])) {
+                    continue;
+                }
+
+                if (! in_array($unit['unit_type'], $propertyType->allowedUnitTypeValues(), true)) {
+                    $validator->errors()->add(
+                        "units.{$index}.unit_type",
+                        'The selected unit type is not valid for this property type.'
                     );
                 }
             }

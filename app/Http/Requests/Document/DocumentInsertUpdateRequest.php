@@ -57,14 +57,17 @@ class DocumentInsertUpdateRequest extends FormRequest
         return [
             'type' => [$creating ? 'required' : 'sometimes', Rule::enum(DocumentType::class)],
             'document_kind_id' => [
-                Rule::requiredIf($type === DocumentType::CUSTOM),
+                Rule::requiredIf($creating && $type === DocumentType::CUSTOM),
                 Rule::prohibitedIf($type !== DocumentType::CUSTOM),
                 'integer',
                 Rule::exists('document_kinds', 'id')->where(fn ($query) => $query
                     ->where('organization_id', $organizationId)
                     ->where('is_active', true)),
             ],
-            'lifecycle' => [$creating ? 'sometimes' : 'prohibited', Rule::enum(DocumentLifecycle::class)],
+            'lifecycle' => [
+                $creating ? 'sometimes' : 'prohibited',
+                Rule::in([DocumentLifecycle::DRAFT->value, DocumentLifecycle::ACTIVE->value]),
+            ],
             'title' => [$creating ? 'required' : 'sometimes', 'string', 'min:1', 'max:255'],
             'purpose' => [$creating ? 'required' : 'sometimes', 'string', 'min:1', 'max:500'],
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
@@ -76,7 +79,7 @@ class DocumentInsertUpdateRequest extends FormRequest
                 'sometimes', 'nullable', 'integer',
                 Rule::exists('documents', 'id')->where('organization_id', $organizationId),
             ],
-            'details' => ['sometimes', 'array:'.implode(',', self::DETAIL_KEYS)],
+            'details' => ['sometimes', 'array:' . implode(',', self::DETAIL_KEYS)],
             'details.change_summary' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'details.management_fee_type' => ['sometimes', Rule::in(['fixed', 'percentage'])],
             'details.management_fee_value' => ['sometimes', 'numeric', 'min:0'],
@@ -175,6 +178,14 @@ class DocumentInsertUpdateRequest extends FormRequest
                 $validator->errors()->add('type', 'A document type cannot be changed after it is created.');
             }
 
+            if (
+                $document instanceof Document
+                && $this->exists('document_kind_id')
+                && $this->integer('document_kind_id') !== $document->document_kind_id
+            ) {
+                $validator->errors()->add('document_kind_id', 'A custom document kind cannot be changed after it is created.');
+            }
+
             if ($this->filled('unit_id')) {
                 $propertyId = $this->integer('property_id') ?: $document?->property_id;
                 if ($propertyId === null || ! Unit::query()->whereKey($this->integer('unit_id'))->where('property_id', $propertyId)->exists()) {
@@ -211,8 +222,19 @@ class DocumentInsertUpdateRequest extends FormRequest
                 $validator->errors()->add('details.change_summary', 'A change summary is required for a lease addendum.');
             }
 
-            if ($type === DocumentType::CUSTOM && ! DocumentKind::query()->whereKey($this->integer('document_kind_id'))->exists()) {
+            if (
+                $type === DocumentType::CUSTOM
+                && (! $document instanceof Document || $this->exists('document_kind_id'))
+                && ! DocumentKind::query()->whereKey($this->integer('document_kind_id'))->exists()
+            ) {
                 $validator->errors()->add('document_kind_id', 'The selected custom document kind is unavailable.');
+            }
+
+            $supportingFileCount = count($this->file('supporting_files', []));
+            foreach (['supporting_labels', 'supporting_party_visible'] as $field) {
+                if (count($this->input($field, [])) > $supportingFileCount) {
+                    $validator->errors()->add($field, 'Supporting file metadata must match an uploaded file.');
+                }
             }
         }];
     }

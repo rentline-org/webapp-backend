@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Unit;
 
-use App\Enums\UnitType;
 use App\Enums\PropertyOperationalStatus;
+use App\Enums\UnitType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -53,10 +53,14 @@ class UnitUpdateRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'is_available' => $this->boolean('is_available'),
-            'is_furnished' => $this->boolean('is_furnished'),
-            'is_pet_friendly' => $this->boolean('is_pet_friendly'),
-        ]);
+        $normalized = [];
+
+        foreach (['is_available', 'is_furnished', 'is_pet_friendly'] as $field) {
+            if ($this->exists($field)) {
+                $normalized[$field] = $this->boolean($field);
+            }
+        }
+
+        $this->merge($normalized);
     }
 }

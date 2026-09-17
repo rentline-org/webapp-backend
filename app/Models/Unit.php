@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use App\Enums\MediaCollection;
-use App\Enums\PropertyType;
-use App\Enums\PropertyOperationalStatus;
 use App\Enums\LeaseWorkflowStatus;
+use App\Enums\MediaCollection;
+use App\Enums\PropertyOperationalStatus;
+use App\Enums\PropertyType;
 use App\Enums\UnitOccupancyStatus;
 use App\Enums\UnitType;
 use App\Traits\HasGallery;
@@ -15,34 +15,36 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
- * @property int $id
- * @property int $property_id
- * @property string $name
- * @property string|null $description
- * @property UnitType $unit_type
- * @property bool $is_available
- * @property bool $is_furnished
- * @property bool $is_pet_friendly
- * @property numeric|null $rent_price
- * @property numeric|null $sale_price
- * @property numeric|null $buy_price
- * @property int|null $bedrooms
- * @property int|null $bathrooms
- * @property numeric|null $square_feet
+ * @property int                          $id
+ * @property int                          $property_id
+ * @property string                       $name
+ * @property string|null                  $description
+ * @property UnitType                     $unit_type
+ * @property bool                         $is_available
+ * @property bool                         $is_furnished
+ * @property bool                         $is_pet_friendly
+ * @property numeric|null                 $rent_price
+ * @property numeric|null                 $sale_price
+ * @property numeric|null                 $buy_price
+ * @property int|null                     $bedrooms
+ * @property int|null                     $bathrooms
+ * @property numeric|null                 $square_feet
  * @property array<array-key, mixed>|null $amenities
  * @property array<array-key, mixed>|null $sale_types
- * @property \Illuminate\Support\Carbon|null $available_from
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property string|null $slug
- * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, \App\Models\Media> $media
+ * @property Carbon|null                  $available_from
+ * @property Carbon|null                  $created_at
+ * @property Carbon|null                  $updated_at
+ * @property string|null                  $slug
+ * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, Media> $media
  * @property-read int|null $media_count
- * @property-read \App\Models\Property $property
- * @method static \Database\Factories\UnitFactory factory($count = null, $state = [])
+ * @property-read Property $property
+ *
+ * @method static \Database\Factories\UnitFactory                    factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Unit newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Unit newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Unit query()
@@ -66,6 +68,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Unit whereSquareFeet($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Unit whereUnitType($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Unit whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class Unit extends Model implements HasMedia
@@ -143,9 +146,9 @@ class Unit extends Model implements HasMedia
         return $this->hasMany(ContactAssignment::class);
     }
 
-    public function occupancyStatus(): UnitOccupancyStatus
+    public function occupancyStatus(?string $timezone = null): UnitOccupancyStatus
     {
-        $today = today()->toDateString();
+        $today = Carbon::now($timezone ?? config('app.timezone'))->toDateString();
         $leases = $this->relationLoaded('leases')
             ? $this->leases
             : $this->leases()->where('workflow_status', LeaseWorkflowStatus::ACTIVE->value)->get();
@@ -164,11 +167,11 @@ class Unit extends Model implements HasMedia
         return UnitOccupancyStatus::VACANT;
     }
 
-    public function isOperationallyAvailable(): bool
+    public function isOperationallyAvailable(?string $timezone = null): bool
     {
         return $this->operational_status === PropertyOperationalStatus::ACTIVE
             && $this->archived_at === null
-            && $this->occupancyStatus() === UnitOccupancyStatus::VACANT;
+            && $this->occupancyStatus($timezone) === UnitOccupancyStatus::VACANT;
     }
 
     public function registerMediaCollections(): void

@@ -1,13 +1,16 @@
 <?php
 
-use App\Enums\ContactPersonType;
+use App\Enums\DocumentLifecycle;
 use App\Enums\DocumentType;
 use App\Enums\MediaCollection;
+use App\Enums\OrganizationMemberRole;
+use App\Enums\OrganizationMemberStatus;
 use App\Enums\PropertyType;
 use App\Enums\UnitType;
 use App\Enums\UserRole;
 use App\Models\Contact;
 use App\Models\Document;
+use App\Models\DocumentKind;
 use App\Models\Lease;
 use App\Models\Organization;
 use App\Models\Property;
@@ -68,7 +71,7 @@ function createDocumentTestTenant(Organization $organization, string $name = 'Ta
 {
     return Contact::factory()->tenant()->for($organization)->create([
         'name' => $name,
-        'email' => 'tenant-'.$organization->id.'@example.com',
+        'email' => 'tenant-' . $organization->id . '@example.com',
     ]);
 }
 
@@ -274,7 +277,7 @@ it('rejects cross-organization lease references and mismatched units', function 
     expect($unit->property_id)->toBe($property->id);
 });
 
-it('uploads and removes a signed copy through an explicit transition', function () {
+it('uploads a signed copy and keeps the completed version immutable', function () {
     Storage::fake('documents');
     [$user, $organization] = createDocumentTestOrganization();
     $document = Document::factory()
@@ -329,11 +332,9 @@ it('uploads and removes a signed copy through an explicit transition', function 
     $this
         ->withHeaders($headers)
         ->deleteJson("/api/v1/documents/{$document->id}/signature")
-        ->assertOk()
-        ->assertJsonPath('data.is_signed', false)
-        ->assertJsonPath('data.files.signed', null);
+        ->assertConflict();
 
-    $this->assertDatabaseMissing('media', [
+    $this->assertDatabaseHas('media', [
         'model_type' => Document::class,
         'model_id' => $document->id,
         'collection_name' => MediaCollection::DOCUMENT_SIGNED->value,
@@ -405,7 +406,7 @@ it('lists only filtered documents from the active organization', function () {
 
     $this
         ->withHeaders(useDocumentOrganization($user, $organization))
-        ->getJson('/api/v1/documents?search=oak&type=lease&signature_status=pending&property_id='.$property->id)
+        ->getJson('/api/v1/documents?search=oak&type=lease&signature_status=pending&property_id=' . $property->id)
         ->assertOk()
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.id', $matching->id)
@@ -424,13 +425,24 @@ it('returns 404 for documents in another organization', function () {
         ->assertNotFound();
 });
 
-it('returns 403 when a tenant user tries to manage documents', function () {
+it('returns an empty register to a tenant without shares and forbids document creation', function () {
     Storage::fake('documents');
     [$user, $organization] = createDocumentTestOrganization(UserRole::TENANT);
 
     $this
         ->withHeaders(useDocumentOrganization($user, $organization))
         ->getJson('/api/v1/documents')
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+
+    $this
+        ->withHeaders(useDocumentOrganization($user, $organization))
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::GENERIC->value,
+            'title' => 'Forbidden tenant upload',
+            'purpose' => 'Should not be stored',
+            'file' => fakePdf(),
+        ])
         ->assertForbidden();
 });
 
@@ -480,4 +492,591 @@ it('deletes a document, its lease extension, and its files', function () {
     $this->assertDatabaseMissing('leases', ['document_id' => $document->id]);
     $this->assertDatabaseMissing('media', ['id' => $media->id]);
     Storage::disk('documents')->assertMissing($relativePath);
+});
+
+it('returns the bilingual catalog and keeps custom kinds organization scoped', function () {
+    [$user, $organization] = createDocumentTestOrganization();
+    [, $otherOrganization] = createDocumentTestOrganization();
+    $headers = useDocumentOrganization($user, $organization);
+
+    $created = $this
+        ->withHeaders($headers)
+        ->postJson('/api/v1/document-kinds', [
+            'key' => 'utility_statement',
+            'label_en' => 'Utility statement',
+            'label_pt_br' => 'Conta de consumo',
+            'category' => 'other',
+            'allowed_scopes' => ['property'],
+            'supports_expiry' => false,
+            'default_requires_signature' => false,
+        ]);
+
+    $created
+        ->assertCreated()
+        ->assertJsonPath('data.key', 'custom:utility_statement')
+        ->assertJsonPath('data.required_parties', []);
+
+    $kindId = $created->json('data.custom_kind_id');
+
+    $this
+        ->withHeaders([...$headers, 'Accept-Language' => 'pt-BR'])
+        ->getJson('/api/v1/document-kinds')
+        ->assertOk()
+        ->assertJsonFragment([
+            'key' => DocumentType::LEASE->value,
+            'label' => 'Contrato de locação',
+            'required_parties' => ['tenant', 'landlord'],
+        ])
+        ->assertJsonFragment([
+            'key' => 'custom:utility_statement',
+            'label' => 'Conta de consumo',
+        ]);
+
+    $this
+        ->withHeaders($headers)
+        ->patchJson("/api/v1/document-kinds/{$kindId}", [
+            'label_en' => 'Utility bill',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.label_en', 'Utility bill');
+
+    $externalKind = DocumentKind::withoutGlobalScopes()->create([
+        'organization_id' => $otherOrganization->id,
+        'key' => 'external_kind',
+        'label_en' => 'External kind',
+        'label_pt_br' => 'Tipo externo',
+        'category' => 'other',
+        'allowed_scopes' => ['organization'],
+    ]);
+
+    $this
+        ->withHeaders($headers)
+        ->patchJson("/api/v1/document-kinds/{$externalKind->id}", [
+            'label_en' => 'Leaked kind',
+        ])
+        ->assertNotFound();
+});
+
+it('enforces custom kind scope and expiry capabilities', function () {
+    Storage::fake('documents');
+    [$user, $organization] = createDocumentTestOrganization();
+    [$property] = createDocumentTestProperty($organization);
+    $headers = useDocumentOrganization($user, $organization);
+    $kind = DocumentKind::query()->create([
+        'organization_id' => $organization->id,
+        'key' => 'property_note',
+        'label_en' => 'Property note',
+        'label_pt_br' => 'Nota do imóvel',
+        'category' => 'other',
+        'allowed_scopes' => ['property'],
+        'supports_expiry' => false,
+    ]);
+
+    $basePayload = [
+        'type' => DocumentType::CUSTOM->value,
+        'document_kind_id' => $kind->id,
+        'title' => 'Property note',
+        'purpose' => 'Internal property record',
+        'file' => fakePdf('property-note.pdf'),
+    ];
+
+    $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', $basePayload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('context');
+
+    $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            ...$basePayload,
+            'property_id' => $property->id,
+            'expires_on' => '2027-01-01',
+            'file' => fakePdf('property-note-with-expiry.pdf'),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('expires_on');
+
+    $created = $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            ...$basePayload,
+            'property_id' => $property->id,
+            'file' => fakePdf('valid-property-note.pdf'),
+        ]);
+
+    $created
+        ->assertCreated()
+        ->assertJsonPath('data.custom_kind_id', $kind->id)
+        ->assertJsonPath('data.property.id', $property->id);
+
+    $this
+        ->withHeaders($headers)
+        ->patchJson('/api/v1/documents/' . $created->json('data.id'), [
+            'title' => 'Updated property note',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.title', 'Updated property note');
+});
+
+it('creates immutable revisions and completes signatures only after every signer is complete', function () {
+    Storage::fake('documents');
+    [$user, $organization] = createDocumentTestOrganization();
+    [$property, $unit] = createDocumentTestProperty($organization);
+    $tenant = createDocumentTestTenant($organization);
+    $headers = useDocumentOrganization($user, $organization);
+
+    $created = $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::INSURANCE_POLICY->value,
+            'title' => 'Rental guarantee insurance',
+            'purpose' => 'Lease guarantee evidence',
+            'property_id' => $property->id,
+            'unit_id' => $unit->id,
+            'requires_signature' => true,
+            'expires_on' => '2027-08-31',
+            'details' => [
+                'provider' => 'Example Seguros',
+                'policy_number' => 'POL-2026-001',
+                'premium_amount' => '325.50',
+                'currency' => 'BRL',
+            ],
+            'parties' => [[
+                'contact_id' => $tenant->id,
+                'role' => 'tenant',
+                'is_primary' => true,
+            ]],
+            'signers' => [[
+                'contact_id' => $tenant->id,
+                'role' => 'tenant',
+            ]],
+            'file' => fakePdf('policy-v1.pdf'),
+            'supporting_files' => [
+                fakePdf('receipt.pdf'),
+                fakePdf('coverage-summary.pdf'),
+            ],
+            'supporting_labels' => ['Premium receipt', 'Coverage summary'],
+            'supporting_party_visible' => [false, true],
+        ]);
+
+    $created
+        ->assertCreated()
+        ->assertJsonPath('data.current_version.version_number', 1)
+        ->assertJsonPath('data.signature_status', 'pending')
+        ->assertJsonCount(2, 'data.files.supporting');
+
+    $documentId = $created->json('data.id');
+    $revision = $this
+        ->withHeaders($headers)
+        ->post("/api/v1/documents/{$documentId}/versions", [
+            'file' => fakePdf('policy-v2.pdf'),
+            'signed_file' => fakePdf('policy-v2-signed.pdf'),
+            'notes' => 'Corrected insured unit.',
+        ]);
+
+    $revision
+        ->assertOk()
+        ->assertJsonPath('data.current_version.version_number', 2)
+        ->assertJsonPath('data.current_version.finalized_at', null)
+        ->assertJsonPath('data.is_signed', false)
+        ->assertJsonPath('data.signature_status', 'pending')
+        ->assertJsonPath('data.signers.0.status', 'pending')
+        ->assertJsonPath('data.files.signed.file_name', 'policy-v2-signed.pdf');
+
+    $signerId = $revision->json('data.signers.0.id');
+    $completed = $this
+        ->withHeaders($headers)
+        ->patchJson("/api/v1/documents/{$documentId}/signers/{$signerId}", [
+            'status' => 'signed',
+        ]);
+
+    $completed
+        ->assertOk()
+        ->assertJsonPath('data.is_signed', true)
+        ->assertJsonPath('data.signature_status', 'signed');
+
+    expect($completed->json('data.current_version.finalized_at'))->not->toBeNull();
+
+    $this
+        ->withHeaders($headers)
+        ->patchJson("/api/v1/documents/{$documentId}/signers/{$signerId}", [
+            'status' => 'pending',
+        ])
+        ->assertConflict();
+
+    $this
+        ->withHeaders($headers)
+        ->deleteJson("/api/v1/documents/{$documentId}/signature")
+        ->assertConflict();
+
+    $this->assertDatabaseHas('document_audit_events', [
+        'document_id' => $documentId,
+        'event' => 'document.signer_status_changed',
+    ]);
+});
+
+it('grants tenant access only through an active share and revokes it immediately', function () {
+    Storage::fake('documents');
+    [$manager, $organization] = createDocumentTestOrganization();
+
+    $tenantUser = User::query()->create([
+        'name' => 'Portal Tenant',
+        'first_name' => 'Portal',
+        'last_name' => 'Tenant',
+        'email' => 'portal-tenant-' . $organization->id . '@example.com',
+        'phone' => '+551188880001',
+        'password' => 'password',
+        'email_verified_at' => now(),
+        'is_active' => true,
+    ]);
+    $tenantUser->assignRole(UserRole::TENANT);
+    $tenantUser->organizations()->attach($organization, [
+        'role' => OrganizationMemberRole::TENANT->value,
+        'status' => OrganizationMemberStatus::ACTIVE->value,
+        'accepted_at' => now(),
+    ]);
+    $tenantContact = Contact::factory()->tenant()->for($organization)->create([
+        'user_id' => $tenantUser->id,
+        'name' => 'Portal Tenant',
+        'email' => $tenantUser->email,
+    ]);
+    $unlinkedContact = Contact::factory()->tenant()->for($organization)->create([
+        'user_id' => null,
+        'name' => 'Unlinked Tenant',
+        'email' => 'unlinked-' . $organization->id . '@example.com',
+    ]);
+    $managerHeaders = useDocumentOrganization($manager, $organization);
+
+    $created = $this
+        ->withHeaders($managerHeaders)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::GENERIC->value,
+            'title' => 'Tenant handover pack',
+            'purpose' => 'Shared move-in documents',
+            'parties' => [
+                ['contact_id' => $tenantContact->id, 'role' => 'tenant', 'is_primary' => true],
+                ['contact_id' => $unlinkedContact->id, 'role' => 'co_tenant'],
+            ],
+            'file' => fakePdf('handover.pdf'),
+            'supporting_files' => [
+                fakePdf('internal-checklist.pdf'),
+                fakePdf('tenant-instructions.pdf'),
+            ],
+            'supporting_party_visible' => [false, true],
+        ]);
+
+    $created->assertCreated();
+    $documentId = $created->json('data.id');
+
+    $tenantHeaders = useDocumentOrganization($tenantUser, $organization);
+    $this
+        ->withHeaders($tenantHeaders)
+        ->getJson('/api/v1/documents')
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+    $this
+        ->withHeaders($tenantHeaders)
+        ->getJson("/api/v1/documents/{$documentId}")
+        ->assertForbidden();
+
+    $this
+        ->withHeaders(useDocumentOrganization($manager, $organization))
+        ->postJson("/api/v1/documents/{$documentId}/shares", [
+            'user_id' => $tenantUser->id,
+            'contact_id' => $unlinkedContact->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('contact_id');
+
+    $shared = $this
+        ->withHeaders($managerHeaders)
+        ->postJson("/api/v1/documents/{$documentId}/shares", [
+            'user_id' => $tenantUser->id,
+            'contact_id' => $tenantContact->id,
+        ]);
+
+    $shared
+        ->assertOk()
+        ->assertJsonCount(1, 'data.shares');
+
+    $shareId = $shared->json('data.shares.0.id');
+    $hiddenSupportingUrl = $shared->json('data.files.supporting.0.download_url');
+    $visibleSupportingUrl = $shared->json('data.files.supporting.1.download_url');
+
+    $this
+        ->withHeaders(useDocumentOrganization($tenantUser, $organization))
+        ->getJson('/api/v1/documents')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $documentId)
+        ->assertJsonPath('data.0.details', [])
+        ->assertJsonPath('data.0.uploader', null);
+    $this
+        ->withHeaders($tenantHeaders)
+        ->get("/api/v1/documents/{$documentId}/files/original")
+        ->assertOk();
+    $this
+        ->withHeaders($tenantHeaders)
+        ->get($hiddenSupportingUrl)
+        ->assertForbidden();
+    $this
+        ->withHeaders($tenantHeaders)
+        ->get($visibleSupportingUrl)
+        ->assertOk();
+
+    $this
+        ->withHeaders(useDocumentOrganization($manager, $organization))
+        ->deleteJson("/api/v1/documents/{$documentId}/shares/{$shareId}")
+        ->assertOk()
+        ->assertJsonCount(0, 'data.shares');
+
+    $this
+        ->withHeaders(useDocumentOrganization($tenantUser, $organization))
+        ->getJson("/api/v1/documents/{$documentId}")
+        ->assertForbidden();
+    $this
+        ->withHeaders($tenantHeaders)
+        ->get("/api/v1/documents/{$documentId}/files/original")
+        ->assertForbidden();
+});
+
+it('rejects more than twenty supporting files and files larger than ten megabytes', function () {
+    Storage::fake('documents');
+    [$user, $organization] = createDocumentTestOrganization();
+    $headers = useDocumentOrganization($user, $organization);
+    $supportingFiles = [];
+    for ($index = 1; $index <= 21; $index++) {
+        $supportingFiles[] = fakePdf("supporting-{$index}.pdf");
+    }
+
+    $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::GENERIC->value,
+            'title' => 'Too many attachments',
+            'purpose' => 'Validate attachment count',
+            'file' => fakePdf(),
+            'supporting_files' => $supportingFiles,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('supporting_files');
+
+    $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::GENERIC->value,
+            'title' => 'Oversized file',
+            'purpose' => 'Validate file size',
+            'file' => UploadedFile::fake()->create('oversized.pdf', 10241, 'application/pdf'),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('file');
+});
+
+it('returns 422 when activating a draft without a primary file', function () {
+    Storage::fake('documents');
+    [$user, $organization] = createDocumentTestOrganization();
+    $document = Document::factory()->for($organization)->create([
+        'uploaded_by' => $user->id,
+        'lifecycle' => DocumentLifecycle::DRAFT,
+    ]);
+
+    $this
+        ->withHeaders(useDocumentOrganization($user, $organization))
+        ->postJson("/api/v1/documents/{$document->id}/activate")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('file');
+
+    expect($document->refresh()->lifecycle)->toBe(DocumentLifecycle::DRAFT);
+    $this->assertDatabaseMissing('document_versions', [
+        'document_id' => $document->id,
+    ]);
+    $this->assertDatabaseMissing('document_audit_events', [
+        'document_id' => $document->id,
+        'event' => 'document.activated',
+    ]);
+});
+
+it('returns 422 when activating a document without its required parties', function () {
+    Storage::fake('documents');
+    [$user, $organization] = createDocumentTestOrganization();
+    [$property] = createDocumentTestProperty($organization);
+    $headers = useDocumentOrganization($user, $organization);
+
+    $created = $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::PROPERTY_MANAGEMENT_AGREEMENT->value,
+            'title' => 'Property management agreement',
+            'purpose' => 'Authorize property management',
+            'property_id' => $property->id,
+            'file' => fakePdf('management-agreement.pdf'),
+        ]);
+
+    $created
+        ->assertCreated()
+        ->assertJsonPath('data.lifecycle', DocumentLifecycle::DRAFT->value)
+        ->assertJsonPath('data.requires_signature', true);
+
+    $documentId = $created->json('data.id');
+    $this
+        ->withHeaders($headers)
+        ->postJson("/api/v1/documents/{$documentId}/activate")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('parties');
+
+    $this->assertDatabaseHas('documents', [
+        'id' => $documentId,
+        'lifecycle' => DocumentLifecycle::DRAFT->value,
+    ]);
+    $this->assertDatabaseMissing('document_audit_events', [
+        'document_id' => $documentId,
+        'event' => 'document.activated',
+    ]);
+});
+
+it('returns 422 when activating a signature-required document without a signer', function () {
+    Storage::fake('documents');
+    [$user, $organization] = createDocumentTestOrganization();
+    [$property] = createDocumentTestProperty($organization);
+    $owner = Contact::factory()->for($organization)->create(['name' => 'Property Owner']);
+    $manager = Contact::factory()->for($organization)->create(['name' => 'Property Manager']);
+    $headers = useDocumentOrganization($user, $organization);
+
+    $created = $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::PROPERTY_MANAGEMENT_AGREEMENT->value,
+            'title' => 'Signed management agreement',
+            'purpose' => 'Authorize property management',
+            'property_id' => $property->id,
+            'parties' => [
+                ['contact_id' => $owner->id, 'role' => 'owner', 'is_primary' => true],
+                ['contact_id' => $manager->id, 'role' => 'manager'],
+            ],
+            'file' => fakePdf('signed-management-agreement.pdf'),
+        ]);
+
+    $created->assertCreated();
+
+    $documentId = $created->json('data.id');
+    $this
+        ->withHeaders($headers)
+        ->postJson("/api/v1/documents/{$documentId}/activate")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('signers');
+
+    $this->assertDatabaseHas('documents', [
+        'id' => $documentId,
+        'lifecycle' => DocumentLifecycle::DRAFT->value,
+    ]);
+    $this->assertDatabaseMissing('document_audit_events', [
+        'document_id' => $documentId,
+        'event' => 'document.activated',
+    ]);
+});
+
+it('activates a ready draft, supersedes its predecessor, and returns 409 for later draft-only mutations', function () {
+    Storage::fake('documents');
+    [$user, $organization] = createDocumentTestOrganization();
+    $headers = useDocumentOrganization($user, $organization);
+
+    $predecessor = $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::GENERIC->value,
+            'lifecycle' => DocumentLifecycle::ACTIVE->value,
+            'title' => 'Operations policy v1',
+            'purpose' => 'Property operations',
+            'file' => fakePdf('operations-policy-v1.pdf'),
+        ]);
+    $predecessor->assertCreated();
+
+    $successor = $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::GENERIC->value,
+            'title' => 'Operations policy v2',
+            'purpose' => 'Property operations',
+            'supersedes_document_id' => $predecessor->json('data.id'),
+            'file' => fakePdf('operations-policy-v2.pdf'),
+        ]);
+    $successor->assertCreated();
+
+    $documentId = $successor->json('data.id');
+    $activated = $this
+        ->withHeaders($headers)
+        ->postJson("/api/v1/documents/{$documentId}/activate");
+
+    $activated
+        ->assertOk()
+        ->assertJsonPath('data.lifecycle', DocumentLifecycle::ACTIVE->value)
+        ->assertJsonPath('data.capabilities.can_activate', false)
+        ->assertJsonPath('data.current_version.version_number', 1);
+    $this->assertDatabaseHas('documents', [
+        'id' => $predecessor->json('data.id'),
+        'lifecycle' => DocumentLifecycle::SUPERSEDED->value,
+    ]);
+    $this->assertDatabaseHas('documents', [
+        'id' => $documentId,
+        'lifecycle' => DocumentLifecycle::ACTIVE->value,
+    ]);
+    $this->assertDatabaseHas('document_audit_events', [
+        'document_id' => $documentId,
+        'actor_id' => $user->id,
+        'event' => 'document.activated',
+    ]);
+
+    $this
+        ->withHeaders($headers)
+        ->postJson("/api/v1/documents/{$documentId}/activate")
+        ->assertConflict();
+    $this
+        ->withHeaders($headers)
+        ->patchJson("/api/v1/documents/{$documentId}", ['parties' => []])
+        ->assertConflict();
+
+    $this->assertDatabaseCount('document_versions', 2);
+    $this->assertDatabaseHas('documents', [
+        'id' => $documentId,
+        'lifecycle' => DocumentLifecycle::ACTIVE->value,
+    ]);
+});
+
+it('archives operational documents and rejects later file mutations', function () {
+    Storage::fake('documents');
+    [$user, $organization] = createDocumentTestOrganization();
+    $headers = useDocumentOrganization($user, $organization);
+
+    $created = $this
+        ->withHeaders($headers)
+        ->post('/api/v1/documents', [
+            'type' => DocumentType::GENERIC->value,
+            'lifecycle' => DocumentLifecycle::ACTIVE->value,
+            'title' => 'Active operations manual',
+            'purpose' => 'Property operations',
+            'file' => fakePdf('operations.pdf'),
+        ]);
+
+    $created->assertCreated();
+    $documentId = $created->json('data.id');
+
+    $this
+        ->withHeaders($headers)
+        ->deleteJson("/api/v1/documents/{$documentId}")
+        ->assertConflict();
+
+    $this
+        ->withHeaders($headers)
+        ->postJson("/api/v1/documents/{$documentId}/archive")
+        ->assertOk()
+        ->assertJsonPath('data.lifecycle', DocumentLifecycle::ARCHIVED->value);
+
+    $this
+        ->withHeaders($headers)
+        ->post("/api/v1/documents/{$documentId}/versions", [
+            'file' => fakePdf('operations-v2.pdf'),
+        ])
+        ->assertConflict();
 });

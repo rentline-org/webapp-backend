@@ -48,6 +48,17 @@ class ContactResource extends JsonResource
                     $this->leaseParties->pluck('lease')->filter()->unique('id')->values()
                 )
             ),
+            'portal_access' => $this->whenLoaded('latestInvitation', fn () => [
+                'linked' => $this->user_id !== null,
+                'invitation' => $this->latestInvitation === null ? null : [
+                    'id' => $this->latestInvitation->id,
+                    'email' => $this->latestInvitation->email,
+                    'role' => $this->latestInvitation->role->value,
+                    'status' => $this->latestInvitation->status(),
+                    'expires_at' => $this->latestInvitation->expires_at?->toIso8601String(),
+                    'accepted_at' => $this->latestInvitation->accepted_at?->toIso8601String(),
+                ],
+            ]),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

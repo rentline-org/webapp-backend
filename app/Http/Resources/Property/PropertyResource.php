@@ -22,6 +22,9 @@ class PropertyResource extends JsonResource
         $activeUnits = $this->relationLoaded('units')
             ? $this->units->whereNull('archived_at')
             : collect();
+        $timezone = $this->relationLoaded('organization')
+            ? ($this->organization?->timezone ?? config('app.timezone'))
+            : config('app.timezone');
 
         return [
             'id' => $this->id,
@@ -37,7 +40,7 @@ class PropertyResource extends JsonResource
             'property_type' => $this->property_type,
             'operational_status' => $this->operational_status?->value ?? $this->operational_status,
             'archived_at' => $this->archived_at,
-            'is_available' => $primaryUnit?->isOperationallyAvailable(),
+            'is_available' => $primaryUnit?->isOperationallyAvailable($timezone),
             'is_furnished' => $primaryUnit?->is_furnished,
             'rent_price' => $primaryUnit?->rent_price,
             'sale_price' => $primaryUnit?->sale_price,
@@ -50,9 +53,9 @@ class PropertyResource extends JsonResource
             'is_pet_friendly' => $primaryUnit?->is_pet_friendly,
             'sale_types' => $primaryUnit?->sale_types,
             'occupancy_summary' => $this->when($this->relationLoaded('units'), fn () => [
-                'vacant' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus()->value === 'vacant')->count(),
-                'reserved' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus()->value === 'reserved')->count(),
-                'occupied' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus()->value === 'occupied')->count(),
+                'vacant' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus($timezone)->value === 'vacant')->count(),
+                'reserved' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus($timezone)->value === 'reserved')->count(),
+                'occupied' => $activeUnits->filter(fn ($unit) => $unit->occupancyStatus($timezone)->value === 'occupied')->count(),
             ]),
             'thumbnail' => $this->thumbnail(),
             'gallery_urls' => $this->gallery(),
@@ -74,8 +77,14 @@ class PropertyResource extends JsonResource
                 'id' => $assignment->id,
                 'contact_id' => $assignment->contact_id,
                 'unit_id' => $assignment->unit_id,
+                'lease_id' => $assignment->lease_id,
                 'role' => $assignment->role?->value ?? $assignment->role,
                 'source' => $assignment->source?->value ?? $assignment->source,
+                'scope' => $assignment->unit_id === null ? 'property' : 'unit',
+                'is_primary' => $assignment->is_primary,
+                'starts_on' => $assignment->starts_on?->toDateString(),
+                'ends_on' => $assignment->ends_on?->toDateString(),
+                'ownership_percentage' => $assignment->ownership_percentage,
                 'name' => $assignment->contact?->name,
             ])->values()),
 

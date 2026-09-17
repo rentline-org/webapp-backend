@@ -49,4 +49,10 @@ return [
     'invitation.email.expiry' => 'This single-use invitation expires in seven days.',
     'membership.owner_protected' => 'The organization owner cannot be changed or removed.',
     'membership.tenant_contact_required' => 'A tenant member must be linked to a contact in this organization.',
+    'operations_digest.subject' => ':organization needs your attention',
+    'operations_digest.greeting' => 'Daily operations digest',
+    'operations_digest.introduction' => 'There are :count open item(s) related to leases, documents, signatures, or inspections.',
+    'operations_digest.action' => 'Review action items',
+    'operations_digest.footer' => 'This digest is generated once per organization-local day.',
+    'operations_digest.notification_title' => 'Property operations need attention',
 ];

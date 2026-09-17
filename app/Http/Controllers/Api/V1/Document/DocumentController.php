@@ -38,13 +38,19 @@ class DocumentController extends Controller
             'lease_id' => ['sometimes', 'integer', 'min:1'],
             'contact_id' => ['sometimes', 'integer', 'min:1'],
             'party_role' => ['sometimes', 'string', 'max:50'],
-            'signature_status' => ['sometimes', Rule::in(['signed', 'pending', 'not_required'])],
+            'signature_status' => ['sometimes', Rule::in([
+                'signed',
+                'pending',
+                'partially_signed',
+                'declined',
+                'not_required',
+            ])],
             'visibility' => ['sometimes', Rule::in(['shared', 'internal'])],
             'expires_from' => ['sometimes', 'date_format:Y-m-d'],
             'expires_to' => ['sometimes', 'date_format:Y-m-d', 'after_or_equal:expires_from'],
             'per_page' => ['sometimes', 'integer', 'between:1,100'],
             'page' => ['sometimes', 'integer', 'min:1'],
-        ]), $request->integer('per_page', 15));
+        ]), $request->integer('per_page', 15), $request->user());
 
         return DocumentResource::collection($documents);
     }
@@ -65,7 +71,14 @@ class DocumentController extends Controller
     {
         Gate::authorize('view', $document);
 
-        return DocumentResource::make($this->documentService->load($document));
+        $loadedDocument = $this->documentService->load($document);
+        $this->documentService->audit(
+            $loadedDocument,
+            'document.viewed',
+            request()->user()?->id,
+        );
+
+        return DocumentResource::make($loadedDocument);
     }
 
     public function update(DocumentInsertUpdateRequest $request, Document $document)
@@ -96,6 +109,15 @@ class DocumentController extends Controller
 
         return DocumentResource::make(
             $this->documentService->archive($document, $request->user()->id)
+        );
+    }
+
+    public function activate(Request $request, Document $document): DocumentResource
+    {
+        Gate::authorize('update', $document);
+
+        return DocumentResource::make(
+            $this->documentService->activate($document, $request->user()->id)
         );
     }
 }

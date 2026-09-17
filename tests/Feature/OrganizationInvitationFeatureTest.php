@@ -65,7 +65,7 @@ it('creates a single-use tenant invitation from an organization contact', functi
 
     $invitation = OrganizationInvitation::query()->findOrFail($response->json('data.id'));
     expect($invitation->token_hash)->toHaveLength(64)
-        ->and($invitation->expires_at->diffInDays($invitation->created_at))->toBe(7.0);
+        ->and($invitation->created_at->diffInDays($invitation->expires_at))->toBe(7.0);
 
     Notification::assertCount(1);
 });
@@ -99,6 +99,10 @@ it('accepts an invitation for a new user and links the tenant contact exactly on
         }
     );
 
+    // Acceptance happens from the invitee's browser, not the inviter's
+    // authenticated session used to create the invitation above.
+    $this->app['auth']->forgetGuards();
+
     $acceptance = $this->postJson("/api/v1/invitations/{$token}/accept", [
         'name' => 'Joao Tenant',
         'password' => 'secure-password',
@@ -106,7 +110,7 @@ it('accepts an invitation for a new user and links the tenant contact exactly on
     ]);
 
     $acceptance
-        ->assertOk()
+        ->assertCreated()
         ->assertJsonPath('data.email', 'joao@example.com')
         ->assertJsonPath('data.locale', 'pt-BR');
 

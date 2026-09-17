@@ -23,6 +23,7 @@ use App\Services\User\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -257,6 +258,20 @@ class UserController extends Controller
         UserProfileCacheService::forget($user->id);
 
         return UserResource::make($updatedUser);
+    }
+
+    public function updateLocale(Request $request): UserResource
+    {
+        $user = $request->user();
+        Gate::authorize('update', $user);
+        $data = $request->validate([
+            'locale' => ['required', Rule::in(config('app.supported_locales', ['en']))],
+        ]);
+
+        $user->update(['locale' => $data['locale']]);
+        UserProfileCacheService::forget($user->id);
+
+        return UserResource::make($user->refresh());
     }
 
     /**

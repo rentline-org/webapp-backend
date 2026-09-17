@@ -32,7 +32,6 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
-            'user_name' => fake()->userName(),
             'phone' => fake()->phoneNumber(),
             'email' => fake()->unique()->safeEmail(),
             'locale' => 'en',

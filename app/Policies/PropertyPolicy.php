@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Property;
 use App\Models\User;
 use App\Services\Organization\ActiveOrganizationContext;
+use App\Services\Organization\AssignedPropertyAccess;
 
 class PropertyPolicy
 {
@@ -15,7 +16,7 @@ class PropertyPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isSuperAdmin() || $user->isLandlord();
+        return $user->isSuperAdmin() || $user->canOperateActiveOrganization();
     }
 
     /**
@@ -26,7 +27,7 @@ class PropertyPolicy
      */
     public function view(User $user, Property $property): bool
     {
-        return $this->canManage($user, $property);
+        return $this->canView($user, $property);
     }
 
     /**
@@ -37,7 +38,7 @@ class PropertyPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isSuperAdmin() || $user->isLandlord();
+        return $user->isSuperAdmin() || $user->canManageActiveOrganization();
     }
 
     /**
@@ -62,13 +63,15 @@ class PropertyPolicy
             return true;
         }
 
-        if (! $user->isLandlord()) {
+        if (! $user->canOperateActiveOrganization()) {
             return false;
         }
 
         $activeOrgId = app(ActiveOrganizationContext::class)->id();
 
-        return $activeOrgId && $property->organization_id === $activeOrgId;
+        return $activeOrgId
+            && $property->organization_id === $activeOrgId
+            && app(AssignedPropertyAccess::class)->canManageProperty($user, $activeOrgId, $property->id);
     }
 
     /** Restore is only meaningful if you use soft deletes. */
@@ -89,12 +92,31 @@ class PropertyPolicy
             return true;
         }
 
-        if (! $user->isLandlord()) {
+        if (! $user->canOperateActiveOrganization()) {
             return false;
         }
 
         $activeOrgId = app(ActiveOrganizationContext::class)->id();
 
-        return $activeOrgId && $property->organization_id === $activeOrgId;
+        return $activeOrgId
+            && $property->organization_id === $activeOrgId
+            && app(AssignedPropertyAccess::class)->canManageProperty($user, $activeOrgId, $property->id);
+    }
+
+    private function canView(User $user, Property $property): bool
+    {
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        if (! $user->canOperateActiveOrganization()) {
+            return false;
+        }
+
+        $activeOrgId = app(ActiveOrganizationContext::class)->id();
+
+        return $activeOrgId
+            && $property->organization_id === $activeOrgId
+            && app(AssignedPropertyAccess::class)->canAccessProperty($user, $activeOrgId, $property->id);
     }
 }

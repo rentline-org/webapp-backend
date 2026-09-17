@@ -9,16 +9,19 @@ use App\Enums\LeaseFinancialTermFrequency;
 use App\Enums\LeaseFinancialTermType;
 use App\Enums\LeasePartyRole;
 use App\Enums\LeaseWorkflowStatus;
+use App\Enums\PropertyOperationalStatus;
 use App\Enums\RentalGuaranteeType;
 use App\Models\Contact;
 use App\Models\ContactAssignment;
 use App\Models\Lease;
 use App\Models\LeaseAmendment;
+use App\Models\LeaseFinancialTerm;
 use App\Models\Organization;
 use App\Models\Property;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\Organization\ActiveOrganizationContext;
+use App\Services\Organization\AssignedPropertyAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -30,7 +33,10 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class LeaseService
 {
-    public function __construct(private readonly ActiveOrganizationContext $activeOrganizationContext) {}
+    public function __construct(
+        private readonly ActiveOrganizationContext $activeOrganizationContext,
+        private readonly AssignedPropertyAccess $assignedPropertyAccess,
+    ) {}
 
     /** @param array<string, mixed> $filters */
     public function paginate(array $filters, User $user): LengthAwarePaginator
@@ -39,6 +45,7 @@ class LeaseService
         $query = Lease::query()
             ->where('organization_id', $organizationId)
             ->with($this->relations())
+            ->withCount('documents')
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
@@ -48,10 +55,12 @@ class LeaseService
 
         if (! $canOperate) {
             $query->whereHas('parties.contact', fn (Builder $query) => $query->where('user_id', $user->id));
+        } else {
+            $this->assignedPropertyAccess->restrictLeases($query, $user, $organizationId);
         }
 
         if (! empty($filters['search'])) {
-            $search = '%'.trim((string) $filters['search']).'%';
+            $search = '%' . trim((string) $filters['search']) . '%';
             $query->where(function (Builder $query) use ($search): void {
                 $query->whereLike('title', $search)
                     ->orWhereHas('property', fn (Builder $query) => $query->whereLike('title', $search))
@@ -70,16 +79,16 @@ class LeaseService
             $query->whereHas('parties', fn (Builder $query) => $query->where('contact_id', $filters['contact_id']));
         }
 
-        $today = today()->toDateString();
+        $today = $this->organizationToday()->toDateString();
         match ($filters['temporal_status'] ?? null) {
             'upcoming' => $query->whereDate('starts_on', '>', $today),
-            'active' => $query->whereDate('starts_on', '<=', $today)->whereDate('ends_on', '>=', $today),
+            'active', 'current' => $query->whereDate('starts_on', '<=', $today)->whereDate('ends_on', '>=', $today),
             'expired' => $query->whereDate('ends_on', '<', $today),
             default => null,
         };
 
         if (isset($filters['expiring_within_days'])) {
-            $query->whereBetween('ends_on', [$today, today()->addDays((int) $filters['expiring_within_days'])->toDateString()]);
+            $query->whereBetween('ends_on', [$today, $this->organizationToday()->addDays((int) $filters['expiring_within_days'])->toDateString()]);
         }
 
         return $query->paginate(min((int) ($filters['per_page'] ?? 15), 100));
@@ -89,7 +98,7 @@ class LeaseService
     {
         $this->ensureOrganization($lease);
 
-        return $lease->load($this->relations());
+        return $lease->load($this->relations())->loadCount('documents');
     }
 
     /** @param array<string, mixed> $data */
@@ -186,10 +195,19 @@ class LeaseService
                 throw new ConflictHttpException('Only an active lease can be terminated.');
             }
 
-            $date = Carbon::parse($terminatedOn ?? today()->toDateString())->startOfDay();
+            $today = $this->organizationToday();
+            $date = Carbon::parse($terminatedOn ?? $today->toDateString(), $today->timezone)->startOfDay();
 
             if ($lease->starts_on !== null && $date->lt($lease->starts_on)) {
                 throw ValidationException::withMessages(['terminated_on' => ['The termination date cannot be before the lease start date.']]);
+            }
+
+            if ($date->gt($today)) {
+                throw ValidationException::withMessages(['terminated_on' => ['A future termination date is not supported.']]);
+            }
+
+            if ($lease->ends_on !== null && $date->gt($lease->ends_on)) {
+                throw ValidationException::withMessages(['terminated_on' => ['The termination date cannot be after the lease end date.']]);
             }
 
             $lease->update([
@@ -210,14 +228,16 @@ class LeaseService
             $this->ensureOrganization($lease);
 
             $isDraft = $lease->workflow_status === LeaseWorkflowStatus::DRAFT;
-            $isUpcoming = $lease->workflow_status === LeaseWorkflowStatus::ACTIVE && $lease->starts_on?->isFuture();
+            $today = $this->organizationToday();
+            $isUpcoming = $lease->workflow_status === LeaseWorkflowStatus::ACTIVE
+                && $lease->starts_on?->toDateString() > $today->toDateString();
 
             if (! $isDraft && ! $isUpcoming) {
                 throw new ConflictHttpException('Only draft or upcoming leases can be cancelled.');
             }
 
             $lease->update(['workflow_status' => LeaseWorkflowStatus::CANCELLED]);
-            $lease->contactAssignments()->delete();
+            $lease->contactAssignments()->update(['ends_on' => $today]);
 
             return $this->load($lease->refresh());
         });
@@ -227,11 +247,23 @@ class LeaseService
     public function renew(Lease $lease, array $data): Lease
     {
         return DB::transaction(function () use ($lease, $data): Lease {
+            $lease = Lease::query()->whereKey($lease->id)->lockForUpdate()->firstOrFail();
             $this->ensureOrganization($lease);
             $lease->loadMissing(['parties', 'financialTerms']);
 
-            if ($lease->workflow_status === LeaseWorkflowStatus::CANCELLED) {
-                throw new ConflictHttpException('A cancelled lease cannot be renewed.');
+            if (! in_array($lease->workflow_status, [LeaseWorkflowStatus::ACTIVE, LeaseWorkflowStatus::TERMINATED], true)) {
+                throw new ConflictHttpException('Only an active or terminated lease can be renewed.');
+            }
+
+            if ($lease->renewals()->where('workflow_status', '!=', LeaseWorkflowStatus::CANCELLED->value)->exists()) {
+                throw new ConflictHttpException('This lease already has a successor renewal.');
+            }
+
+            $effectiveEnd = $lease->terminated_on ?? $lease->ends_on;
+            if ($effectiveEnd !== null && Carbon::parse($data['starts_on'])->lte($effectiveEnd)) {
+                throw ValidationException::withMessages([
+                    'starts_on' => ['A renewal must start after the previous lease ends.'],
+                ]);
             }
 
             $parties = $data['parties'] ?? $lease->parties->map(fn ($party) => [
@@ -239,26 +271,36 @@ class LeaseService
                 'role' => $party->role->value,
                 'is_primary' => $party->is_primary,
             ])->all();
-            $terms = $data['financial_terms'] ?? $lease->financialTerms->map(fn ($term) => [
-                'type' => $term->type->value,
-                'calculation' => $term->calculation->value,
-                'amount' => $term->amount,
-                'percentage' => $term->percentage,
-                'currency' => $term->currency,
-                'frequency' => $term->frequency->value,
-                'calculation_basis' => $term->calculation_basis,
-                'due_day' => $term->due_day,
-                'payer_contact_id' => $term->payer_contact_id,
-                'payee_contact_id' => $term->payee_contact_id,
-                'is_liability' => $term->is_liability,
-            ])->all();
+            $terms = $data['financial_terms'] ?? $lease->financialTerms
+                ->groupBy(fn (LeaseFinancialTerm $term): string => $term->type->value)
+                ->map(fn ($terms) => $terms->first(
+                    fn (LeaseFinancialTerm $term): bool => $this->termIsEffectiveOn($term, $effectiveEnd ?? $lease->ends_on)
+                ))
+                ->filter()
+                ->map(fn (LeaseFinancialTerm $term): array => [
+                    'type' => $term->type->value,
+                    'calculation' => $term->calculation->value,
+                    'amount' => $term->amount,
+                    'percentage' => $term->percentage,
+                    'currency' => $term->currency,
+                    'frequency' => $term->frequency->value,
+                    'calculation_basis' => $term->calculation_basis,
+                    'due_day' => $term->due_day,
+                    'payer_contact_id' => $term->payer_contact_id,
+                    'payee_contact_id' => $term->payee_contact_id,
+                    'is_liability' => $term->is_liability,
+                ])
+                ->values()
+                ->all();
 
             return $this->createDraft([
                 ...$data,
                 'property_id' => $lease->property_id,
                 'unit_id' => $lease->unit_id,
-                'currency' => $lease->currency,
-                'guarantee_type' => $lease->guarantee_type?->value,
+                'currency' => $data['currency'] ?? $lease->currency,
+                'guarantee_type' => array_key_exists('guarantee_type', $data)
+                    ? $data['guarantee_type']
+                    : $lease->guarantee_type?->value,
                 'renewed_from_id' => $lease->id,
                 'parties' => $parties,
                 'financial_terms' => $terms,
@@ -275,6 +317,23 @@ class LeaseService
             if ($lease->workflow_status !== LeaseWorkflowStatus::ACTIVE) {
                 throw new ConflictHttpException('Only an active lease can be amended.');
             }
+
+            $effectiveOn = Carbon::parse($data['effective_on'])->startOfDay();
+            $effectiveEnd = $lease->terminated_on ?? $lease->ends_on;
+
+            if ($lease->starts_on === null || $effectiveOn->lt($lease->starts_on)) {
+                throw ValidationException::withMessages([
+                    'effective_on' => ['The amendment cannot take effect before the lease starts.'],
+                ]);
+            }
+
+            if ($effectiveEnd !== null && $effectiveOn->gt($effectiveEnd)) {
+                throw ValidationException::withMessages([
+                    'effective_on' => ['The amendment cannot take effect after the lease ends.'],
+                ]);
+            }
+
+            $this->validateFinancialTermPayload($data['financial_terms'], $lease, $effectiveOn);
 
             $amendment = $lease->amendments()->create([
                 'organization_id' => $lease->organization_id,
@@ -298,12 +357,24 @@ class LeaseService
     public function activateAmendment(Lease $lease, LeaseAmendment $amendment, User $user): Lease
     {
         return DB::transaction(function () use ($lease, $amendment, $user): Lease {
+            $lease = Lease::query()->whereKey($lease->id)->lockForUpdate()->firstOrFail();
             $this->ensureOrganization($lease);
             abort_unless($amendment->lease_id === $lease->id, 404);
             $amendment = LeaseAmendment::query()->whereKey($amendment->id)->lockForUpdate()->firstOrFail();
 
+            if ($lease->workflow_status !== LeaseWorkflowStatus::ACTIVE) {
+                throw new ConflictHttpException('Only an active lease can receive an amendment.');
+            }
+
             if ($amendment->status !== 'draft') {
                 throw new ConflictHttpException('This amendment has already been activated.');
+            }
+
+            if ($lease->amendments()
+                ->where('status', 'active')
+                ->whereDate('effective_on', '>=', $amendment->effective_on)
+                ->exists()) {
+                throw new ConflictHttpException('Amendments must be activated in effective-date order.');
             }
 
             $amendment->load('terms');
@@ -323,6 +394,8 @@ class LeaseService
             }
 
             $amendment->update(['status' => 'active', 'activated_at' => now(), 'activated_by' => $user->id]);
+            $lease->unsetRelation('financialTerms')->load(['property', 'parties', 'financialTerms']);
+            $this->validateFinancialState($lease, $amendment->effective_on);
             $this->syncLegacySummary($lease);
 
             return $this->load($lease->refresh());
@@ -376,6 +449,11 @@ class LeaseService
             throw ValidationException::withMessages(['unit_id' => ['The selected unit must belong to the selected property and cannot be archived.']]);
         }
 
+        $user = auth()->user();
+        if ($user !== null && ! $this->assignedPropertyAccess->canAccessUnit($user, $organizationId, $unit->id)) {
+            throw new AuthorizationException('The selected unit is not assigned to this agent.');
+        }
+
         return [$property, $unit];
     }
 
@@ -392,7 +470,7 @@ class LeaseService
                 throw ValidationException::withMessages(['parties' => ['Every party must belong to the active organization.']]);
             }
 
-            $key = $contact->id.'|'.$party['role'];
+            $key = $contact->id . '|' . $party['role'];
 
             if (isset($seen[$key])) {
                 throw ValidationException::withMessages(['parties' => ['A contact cannot have the same role twice on one lease.']]);
@@ -415,6 +493,7 @@ class LeaseService
     /** @param array<int, array<string, mixed>> $terms */
     private function syncFinancialTerms(Lease $lease, array $terms): void
     {
+        $this->validateFinancialTermPayload($terms, $lease, $lease->starts_on);
         $lease->financialTerms()->delete();
 
         foreach ($terms as $term) {
@@ -423,7 +502,7 @@ class LeaseService
     }
 
     /** @param array<string, mixed> $term
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function termAttributes(Lease $lease, array $term): array
     {
@@ -450,51 +529,48 @@ class LeaseService
             'due_day' => $term['due_day'] ?? null,
             'effective_from' => $term['effective_from'] ?? $lease->starts_on,
             'effective_to' => $term['effective_to'] ?? $lease->ends_on,
-            'is_liability' => $term['is_liability'] ?? $type === LeaseFinancialTermType::SECURITY_DEPOSIT,
+            'is_liability' => $type === LeaseFinancialTermType::SECURITY_DEPOSIT
+                ? true
+                : ($term['is_liability'] ?? false),
         ];
     }
 
     private function validateActivation(Lease $lease): void
     {
-        $lease->loadMissing(['property', 'parties', 'financialTerms']);
+        $lease->loadMissing(['property', 'unit', 'parties', 'financialTerms']);
         $errors = [];
 
         if ($lease->property_id === null || $lease->unit_id === null) {
             $errors['unit_id'][] = 'An active lease must belong to a property and unit.';
         }
+
+        if ($lease->property?->archived_at !== null || $lease->unit?->archived_at !== null) {
+            $errors['unit_id'][] = 'An archived property or unit cannot receive an active lease.';
+        }
+
+        if ($lease->property?->operational_status !== PropertyOperationalStatus::ACTIVE
+            || $lease->unit?->operational_status !== PropertyOperationalStatus::ACTIVE) {
+            $errors['unit_id'][] = 'The property and unit must be operationally active before lease activation.';
+        }
+
         if ($lease->starts_on === null || $lease->ends_on === null || $lease->ends_on->lte($lease->starts_on)) {
             $errors['ends_on'][] = 'An active lease requires a valid start and end date.';
         }
 
         $primaryTenants = $lease->parties->where('role', LeasePartyRole::PRIMARY_TENANT);
-        if ($primaryTenants->count() !== 1) {
-            $errors['parties'][] = 'An active lease requires exactly one primary tenant.';
+        if ($primaryTenants->isEmpty()) {
+            $errors['parties'][] = 'An active lease requires at least one primary tenant.';
         }
 
-        $rent = $lease->financialTerms->first(fn ($term) => $term->type === LeaseFinancialTermType::RENT && $term->calculation === LeaseFinancialTermCalculation::FIXED);
-        if ($rent === null || $rent->amount === null || (float) $rent->amount <= 0) {
+        $rent = $this->effectiveFinancialTerm($lease, LeaseFinancialTermType::RENT, $lease->starts_on);
+        if ($rent === null
+            || $rent->calculation !== LeaseFinancialTermCalculation::FIXED
+            || $rent->amount === null
+            || (float) $rent->amount <= 0) {
             $errors['financial_terms'][] = 'An active lease requires a positive fixed rent term.';
         }
 
-        if (strtoupper((string) $lease->property?->country) === 'BR') {
-            if (strtoupper((string) $lease->currency) !== 'BRL') {
-                $errors['currency'][] = 'Brazilian urban leases must use BRL.';
-            }
-
-            if ($lease->guarantee_type === RentalGuaranteeType::GUARANTOR
-                && ! $lease->parties->contains('role', LeasePartyRole::GUARANTOR)) {
-                $errors['parties'][] = 'A guarantor guarantee requires a guarantor party.';
-            }
-
-            if ($lease->guarantee_type === RentalGuaranteeType::CASH_DEPOSIT && $rent !== null) {
-                $deposit = $lease->financialTerms->first(fn ($term) => $term->type === LeaseFinancialTermType::SECURITY_DEPOSIT);
-                if ($deposit === null || $deposit->amount === null) {
-                    $errors['financial_terms'][] = 'A cash deposit guarantee requires a security deposit term.';
-                } elseif ((float) $deposit->amount > ((float) $rent->amount * 3)) {
-                    $errors['financial_terms'][] = 'A Brazilian cash deposit cannot exceed three months of rent.';
-                }
-            }
-        }
+        $this->appendBrazilianValidationErrors($lease, $lease->starts_on, $errors);
 
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
@@ -555,8 +631,9 @@ class LeaseService
     {
         $lease->load(['parties', 'financialTerms']);
         $tenant = $lease->parties->firstWhere('role', LeasePartyRole::PRIMARY_TENANT);
-        $rent = $lease->financialTerms->firstWhere('type', LeaseFinancialTermType::RENT);
-        $deposit = $lease->financialTerms->firstWhere('type', LeaseFinancialTermType::SECURITY_DEPOSIT);
+        $effectiveOn = $this->effectiveFinancialDate($lease);
+        $rent = $this->effectiveFinancialTerm($lease, LeaseFinancialTermType::RENT, $effectiveOn);
+        $deposit = $this->effectiveFinancialTerm($lease, LeaseFinancialTermType::SECURITY_DEPOSIT, $effectiveOn);
         $lease->update([
             'tenant_contact_id' => $tenant?->contact_id,
             'tenant_name_snapshot' => $tenant?->name_snapshot,
@@ -571,6 +648,159 @@ class LeaseService
         if ($startsOn !== null && $endsOn !== null && Carbon::parse($endsOn)->lte(Carbon::parse($startsOn))) {
             throw ValidationException::withMessages(['ends_on' => ['The end date must be after the start date.']]);
         }
+    }
+
+    /** @param array<int, array<string, mixed>> $terms */
+    private function validateFinancialTermPayload(array $terms, Lease $lease, Carbon|string|null $effectiveOn): void
+    {
+        $seenTypes = [];
+        $errors = [];
+
+        foreach ($terms as $index => $term) {
+            $type = LeaseFinancialTermType::from($term['type']);
+            $calculation = LeaseFinancialTermCalculation::from(
+                $term['calculation'] ?? LeaseFinancialTermCalculation::FIXED->value
+            );
+
+            if (isset($seenTypes[$type->value])) {
+                $errors["financial_terms.{$index}.type"][] = 'A financial term type can only appear once in the same effective period.';
+            }
+            $seenTypes[$type->value] = true;
+
+            if ($calculation === LeaseFinancialTermCalculation::FIXED && ($term['amount'] ?? null) === null) {
+                $errors["financial_terms.{$index}.amount"][] = 'A fixed financial term requires an amount.';
+            }
+
+            if ($calculation === LeaseFinancialTermCalculation::PERCENTAGE && ($term['percentage'] ?? null) === null) {
+                $errors["financial_terms.{$index}.percentage"][] = 'A percentage financial term requires a percentage.';
+            }
+
+            $from = Carbon::parse($term['effective_from'] ?? $effectiveOn ?? $lease->starts_on);
+            $to = isset($term['effective_to'])
+                ? Carbon::parse($term['effective_to'])
+                : $lease->ends_on;
+
+            if ($to !== null && $to->lt($from)) {
+                $errors["financial_terms.{$index}.effective_to"][] = 'The effective end date cannot be before the effective start date.';
+            }
+
+            if ($lease->starts_on !== null && $from->lt($lease->starts_on)) {
+                $errors["financial_terms.{$index}.effective_from"][] = 'Financial terms cannot start before the lease.';
+            }
+
+            if ($lease->ends_on !== null && $to !== null && $to->gt($lease->ends_on)) {
+                $errors["financial_terms.{$index}.effective_to"][] = 'Financial terms cannot end after the lease.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    private function validateFinancialState(Lease $lease, Carbon|string $effectiveOn): void
+    {
+        $errors = [];
+        $rent = $this->effectiveFinancialTerm($lease, LeaseFinancialTermType::RENT, $effectiveOn);
+
+        if ($rent === null || $rent->calculation !== LeaseFinancialTermCalculation::FIXED || $rent->amount === null || (float) $rent->amount <= 0) {
+            $errors['financial_terms'][] = 'The amendment must leave a positive fixed rent in effect.';
+        }
+
+        $this->appendBrazilianValidationErrors($lease, $effectiveOn, $errors);
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /** @param array<string, array<int, string>> $errors */
+    private function appendBrazilianValidationErrors(Lease $lease, Carbon|string $effectiveOn, array &$errors): void
+    {
+        if (strtoupper((string) $lease->property?->country) !== 'BR') {
+            return;
+        }
+
+        if (strtoupper((string) $lease->currency) !== 'BRL') {
+            $errors['currency'][] = 'Brazilian urban leases must use BRL.';
+        }
+
+        $nonBrlTerm = $lease->financialTerms->first(
+            fn ($term) => $this->termIsEffectiveOn($term, $effectiveOn)
+                && $term->currency !== null
+                && strtoupper((string) $term->currency) !== 'BRL'
+        );
+        if ($nonBrlTerm !== null) {
+            $errors['financial_terms'][] = 'Financial terms for a Brazilian urban lease must use BRL.';
+        }
+
+        if ($lease->guarantee_type === RentalGuaranteeType::GUARANTOR
+            && ! $lease->parties->contains('role', LeasePartyRole::GUARANTOR)) {
+            $errors['parties'][] = 'A guarantor guarantee requires a guarantor party.';
+        }
+
+        if ($lease->guarantee_type !== RentalGuaranteeType::CASH_DEPOSIT) {
+            return;
+        }
+
+        $rent = $this->effectiveFinancialTerm($lease, LeaseFinancialTermType::RENT, $effectiveOn);
+        $deposit = $this->effectiveFinancialTerm($lease, LeaseFinancialTermType::SECURITY_DEPOSIT, $effectiveOn);
+        if ($deposit === null || $deposit->amount === null || (float) $deposit->amount <= 0) {
+            $errors['financial_terms'][] = 'A cash deposit guarantee requires a positive security deposit term.';
+        } elseif ($rent !== null && $rent->amount !== null && (float) $deposit->amount > ((float) $rent->amount * 3)) {
+            $errors['financial_terms'][] = 'A Brazilian cash deposit cannot exceed three months of rent.';
+        }
+    }
+
+    private function effectiveFinancialTerm(
+        Lease $lease,
+        LeaseFinancialTermType $type,
+        Carbon|string|null $effectiveOn,
+    ): ?LeaseFinancialTerm {
+        if ($effectiveOn === null) {
+            return null;
+        }
+
+        return $lease->financialTerms
+            ->where('type', $type)
+            ->first(fn ($term) => $this->termIsEffectiveOn($term, $effectiveOn));
+    }
+
+    private function termIsEffectiveOn(LeaseFinancialTerm $term, Carbon|string|null $effectiveOn): bool
+    {
+        if ($effectiveOn === null) {
+            return false;
+        }
+
+        $date = $effectiveOn instanceof Carbon
+            ? $effectiveOn->toDateString()
+            : Carbon::parse($effectiveOn)->toDateString();
+
+        return ($term->effective_from === null || $term->effective_from->toDateString() <= $date)
+            && ($term->effective_to === null || $term->effective_to->toDateString() >= $date);
+    }
+
+    private function effectiveFinancialDate(Lease $lease): ?Carbon
+    {
+        if ($lease->starts_on === null) {
+            return null;
+        }
+
+        $today = $this->organizationToday();
+        $effectiveDate = $lease->starts_on->gt($today) ? $lease->starts_on : $today;
+        $effectiveEnd = $lease->terminated_on ?? $lease->ends_on;
+
+        return $effectiveEnd !== null && $effectiveDate->gt($effectiveEnd)
+            ? $effectiveEnd
+            : $effectiveDate;
+    }
+
+    private function organizationToday(): Carbon
+    {
+        $timezone = Organization::query()->whereKey($this->organizationId())->value('timezone')
+            ?? config('app.timezone');
+
+        return Carbon::now($timezone)->startOfDay();
     }
 
     private function organizationId(): int
@@ -590,12 +820,14 @@ class LeaseService
     private function relations(): array
     {
         return [
+            'organization:id,timezone',
             'property',
             'unit.leases',
             'parties.contact',
             'financialTerms',
             'amendments.terms',
             'renewedFrom:id,title',
+            'renewals:id,renewed_from_id,workflow_status',
         ];
     }
 }

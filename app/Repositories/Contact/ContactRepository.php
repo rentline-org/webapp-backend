@@ -69,6 +69,22 @@ class ContactRepository implements ContactRepositoryInterface
             });
         }
 
+        if (isset($filters['assigned_scope'])) {
+            $scope = $filters['assigned_scope'];
+            $query->where(function (Builder $query) use ($scope): void {
+                $query->whereHas('assignments', fn (Builder $query) => $query
+                    ->whereIn('property_id', $scope['broad_property_ids'])
+                    ->orWhereIn('unit_id', $scope['unit_ids']))
+                    ->orWhereHas('properties', fn (Builder $query) => $query->whereIn('properties.id', $scope['broad_property_ids']))
+                    ->orWhereHas('leaseParties.lease', fn (Builder $query) => $query
+                        ->whereIn('property_id', $scope['broad_property_ids'])
+                        ->orWhereIn('unit_id', $scope['unit_ids']))
+                    ->orWhereHas('documentParties.document', fn (Builder $query) => $query
+                        ->whereIn('property_id', $scope['broad_property_ids'])
+                        ->orWhereIn('unit_id', $scope['unit_ids']));
+            });
+        }
+
         if (! empty($filters['type'])) {
             $query->where('type', $filters['type']);
         }

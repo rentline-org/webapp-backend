@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Contact;
 use App\Models\User;
 use App\Services\Organization\ActiveOrganizationContext;
+use App\Services\Organization\AssignedPropertyAccess;
 
 class ContactPolicy
 {
@@ -17,7 +18,9 @@ class ContactPolicy
     /** Determine whether the user can view the model. */
     public function view(User $user, Contact $contact): bool
     {
-        return $this->canManage($user) && $this->belongsToActiveOrganization($contact);
+        return $this->canManage($user)
+            && $this->belongsToActiveOrganization($contact)
+            && app(AssignedPropertyAccess::class)->canAccessContact($user, $contact);
     }
 
     /** Determine whether the user can create models. */
@@ -29,13 +32,13 @@ class ContactPolicy
     /** Determine whether the user can update the model. */
     public function update(User $user, Contact $contact): bool
     {
-        return $this->canManage($user) && $this->belongsToActiveOrganization($contact);
+        return $this->view($user, $contact);
     }
 
     /** Determine whether the user can delete the model. */
     public function delete(User $user, Contact $contact): bool
     {
-        return $this->canManage($user) && $this->belongsToActiveOrganization($contact);
+        return $this->view($user, $contact);
     }
 
     /** Determine whether the user can restore the model. */
@@ -52,7 +55,7 @@ class ContactPolicy
 
     private function canManage(User $user): bool
     {
-        return $user->isLandlord() || $user->isSuperAdmin();
+        return $user->isSuperAdmin() || $user->canOperateActiveOrganization();
     }
 
     private function belongsToActiveOrganization(Contact $contact): bool

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -110,6 +111,16 @@ class Contact extends Model
     public function documentParties(): HasMany
     {
         return $this->hasMany(DocumentParty::class);
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(OrganizationInvitation::class);
+    }
+
+    public function latestInvitation(): HasOne
+    {
+        return $this->hasOne(OrganizationInvitation::class)->latestOfMany();
     }
 
     public function maskedTaxId(): ?string

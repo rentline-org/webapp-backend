@@ -32,7 +32,7 @@ class ContactController extends Controller
             'search' => ['sometimes', 'string', 'max:255'],
             'type' => ['sometimes', Rule::enum(ContactPersonType::class)],
             'property_id' => ['sometimes', 'integer', 'min:1'],
-        ]));
+        ]), $request->user());
 
         return ContactResource::collection($contacts);
     }
@@ -57,6 +57,7 @@ class ContactController extends Controller
             'assignments.property',
             'assignments.unit',
             'leaseParties.lease',
+            'latestInvitation',
         ]));
     }
 

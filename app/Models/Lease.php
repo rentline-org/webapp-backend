@@ -7,15 +7,17 @@ use App\Enums\LeaseWorkflowStatus;
 use App\Enums\RentalGuaranteeType;
 use App\Models\Scopes\OrganizationScope;
 use App\Services\Organization\ActiveOrganizationContext;
+use Database\Factories\LeaseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class Lease extends Model
 {
-    /** @use HasFactory<\Database\Factories\LeaseFactory> */
+    /** @use HasFactory<LeaseFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -43,20 +45,6 @@ class Lease extends Model
         'security_deposit',
         'notes',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'starts_on' => 'date',
-            'ends_on' => 'date',
-            'terminated_on' => 'date',
-            'activated_at' => 'datetime',
-            'rent_amount' => 'decimal:2',
-            'security_deposit' => 'decimal:2',
-            'workflow_status' => LeaseWorkflowStatus::class,
-            'guarantee_type' => RentalGuaranteeType::class,
-        ];
-    }
 
     public function organization(): BelongsTo
     {
@@ -105,7 +93,13 @@ class Lease extends Model
 
     public function financialTerms(): HasMany
     {
-        return $this->hasMany(LeaseFinancialTerm::class)->orderBy('effective_from')->orderBy('id');
+        return $this->hasMany(LeaseFinancialTerm::class)
+            ->where(function ($query): void {
+                $query->whereNull('lease_amendment_id')
+                    ->orWhereHas('amendment', fn ($query) => $query->where('status', 'active'));
+            })
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id');
     }
 
     public function amendments(): HasMany
@@ -127,13 +121,16 @@ class Lease extends Model
 
     public function status(): LeaseStatus
     {
-        $today = today();
+        $timezone = $this->relationLoaded('organization')
+            ? ($this->organization?->timezone ?? config('app.timezone'))
+            : config('app.timezone');
+        $today = Carbon::now($timezone)->toDateString();
 
-        if ($this->starts_on === null || $today->lt($this->starts_on)) {
+        if ($this->starts_on === null || $this->starts_on->toDateString() > $today) {
             return LeaseStatus::UPCOMING;
         }
 
-        if ($this->ends_on !== null && $today->gt($this->ends_on)) {
+        if ($this->ends_on !== null && $this->ends_on->toDateString() < $today) {
             return LeaseStatus::EXPIRED;
         }
 
@@ -168,5 +165,19 @@ class Lease extends Model
             $lease->property_id ??= $document?->property_id;
             $lease->unit_id ??= $document?->unit_id;
         });
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'starts_on' => 'date',
+            'ends_on' => 'date',
+            'terminated_on' => 'date',
+            'activated_at' => 'datetime',
+            'rent_amount' => 'decimal:2',
+            'security_deposit' => 'decimal:2',
+            'workflow_status' => LeaseWorkflowStatus::class,
+            'guarantee_type' => RentalGuaranteeType::class,
+        ];
     }
 }

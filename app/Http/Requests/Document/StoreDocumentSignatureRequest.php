@@ -23,8 +23,8 @@ class StoreDocumentSignatureRequest extends FormRequest
             'signed_file' => [
                 'required',
                 'file',
-                'mimes:pdf,doc,docx,jpg,jpeg,png,webp',
-                'extensions:pdf,doc,docx,jpg,jpeg,png,webp',
+                'mimes:pdf,doc,docx,xls,xlsx,csv,txt,jpg,jpeg,png,webp',
+                'extensions:pdf,doc,docx,xls,xlsx,csv,txt,jpg,jpeg,png,webp',
                 'max:10240',
             ],
         ];

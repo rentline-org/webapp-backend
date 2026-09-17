@@ -25,4 +25,10 @@ return [
     'invitation.email.expiry' => 'Este convite de uso único expira em sete dias.',
     'membership.owner_protected' => 'O proprietário da organização não pode ser alterado nem removido.',
     'membership.tenant_contact_required' => 'Um membro inquilino deve estar vinculado a um contato desta organização.',
+    'operations_digest.subject' => ':organization precisa da sua atenção',
+    'operations_digest.greeting' => 'Resumo diário de operações',
+    'operations_digest.introduction' => 'Há :count item(ns) em aberto relacionado(s) a locações, documentos, assinaturas ou vistorias.',
+    'operations_digest.action' => 'Revisar pendências',
+    'operations_digest.footer' => 'Este resumo é gerado uma vez por dia no fuso horário da organização.',
+    'operations_digest.notification_title' => 'Operações imobiliárias precisam de atenção',
 ];

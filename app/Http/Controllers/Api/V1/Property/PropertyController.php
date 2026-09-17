@@ -48,7 +48,7 @@ class PropertyController extends Controller
             $filters['max_rent_price'] = $request->input('max_rent_price');
         }
 
-        $properties = $this->propertyService->all($filters);
+        $properties = $this->propertyService->all($filters, $request->user());
 
         return PropertyResource::collection($properties);
     }

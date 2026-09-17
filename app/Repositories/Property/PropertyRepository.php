@@ -78,10 +78,14 @@ class PropertyRepository implements PropertyRepositoryInterface
 
     protected function query(array $filters = []): Builder
     {
-        $query = Property::query();
+        $query = Property::query()->with('organization:id,timezone');
 
         if (empty($filters['include_archived'])) {
             $query->whereNull('archived_at');
+        }
+
+        if (array_key_exists('assigned_property_ids', $filters)) {
+            $query->whereIn('properties.id', $filters['assigned_property_ids']);
         }
 
         if (! empty($filters['with_units'])) {
@@ -94,14 +98,23 @@ class PropertyRepository implements PropertyRepositoryInterface
 
         if (array_key_exists('is_available', $filters) && $filters['is_available'] !== null) {
             $available = filter_var($filters['is_available'], FILTER_VALIDATE_BOOL);
-            $method = $available ? 'whereHas' : 'whereDoesntHave';
-            $query->{$method}('units', function (Builder $query): void {
-                $query->whereNull('archived_at')
-                    ->where('operational_status', 'active')
-                    ->whereDoesntHave('leases', fn (Builder $leaseQuery) => $leaseQuery
-                        ->where('workflow_status', 'active')
-                        ->whereDate('ends_on', '>=', today()));
-            });
+            if ($available) {
+                $query->whereHas('units', function (Builder $query): void {
+                    $query->whereNull('archived_at')
+                        ->where('operational_status', 'active')
+                        ->whereDoesntHave('leases', fn (Builder $leaseQuery) => $leaseQuery
+                            ->where('workflow_status', 'active')
+                            ->whereDate('ends_on', '>=', today()));
+                });
+            } else {
+                $query->whereDoesntHave('units', function (Builder $query): void {
+                    $query->whereNull('archived_at')
+                        ->where('operational_status', 'active')
+                        ->whereDoesntHave('leases', fn (Builder $leaseQuery) => $leaseQuery
+                            ->where('workflow_status', 'active')
+                            ->whereDate('ends_on', '>=', today()));
+                });
+            }
         }
 
         if (! empty($filters['city'])) {

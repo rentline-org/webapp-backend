@@ -9,16 +9,16 @@ use Illuminate\Support\Arr;
 final class DocumentDTO
 {
     /**
-     * @param  array<string, mixed>  $attributes
-     * @param  array<string, mixed>|null  $leaseAttributes
-     * @param  list<UploadedFile>  $supportingFiles
-     * @param  list<int>  $propertyIds
-     * @param  list<int>  $unitIds
-     * @param  list<array<string, mixed>>  $leaseLinks
-     * @param  list<array<string, mixed>>  $parties
-     * @param  list<array<string, mixed>>  $signers
-     * @param  list<string|null>  $supportingLabels
-     * @param  list<bool>  $supportingPartyVisibility
+     * @param array<string, mixed>       $attributes
+     * @param array<string, mixed>|null  $leaseAttributes
+     * @param list<UploadedFile>         $supportingFiles
+     * @param list<int>                  $propertyIds
+     * @param list<int>                  $unitIds
+     * @param list<array<string, mixed>> $leaseLinks
+     * @param list<array<string, mixed>> $parties
+     * @param list<array<string, mixed>> $signers
+     * @param list<string|null>          $supportingLabels
+     * @param list<bool>                 $supportingPartyVisibility
      */
     public function __construct(
         public readonly array $attributes,
@@ -34,6 +34,9 @@ final class DocumentDTO
         public readonly array $supportingLabels = [],
         public readonly array $supportingPartyVisibility = [],
         public readonly bool $hasContexts = false,
+        public readonly bool $hasPropertyIds = false,
+        public readonly bool $hasUnitIds = false,
+        public readonly bool $hasLeaseLinks = false,
         public readonly bool $hasParties = false,
         public readonly bool $hasSigners = false,
     ) {}
@@ -107,6 +110,9 @@ final class DocumentDTO
             hasContexts: array_key_exists('property_ids', $validated)
                 || array_key_exists('unit_ids', $validated)
                 || array_key_exists('lease_links', $validated),
+            hasPropertyIds: array_key_exists('property_ids', $validated),
+            hasUnitIds: array_key_exists('unit_ids', $validated),
+            hasLeaseLinks: array_key_exists('lease_links', $validated),
             hasParties: array_key_exists('parties', $validated),
             hasSigners: array_key_exists('signers', $validated),
         );

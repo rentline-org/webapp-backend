@@ -55,10 +55,14 @@ class UnitInsertRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'is_available' => $this->boolean('is_available'),
-            'is_furnished' => $this->boolean('is_furnished'),
-            'is_pet_friendly' => $this->boolean('is_pet_friendly'),
-        ]);
+        $normalized = [];
+
+        foreach (['is_available', 'is_furnished', 'is_pet_friendly'] as $field) {
+            if ($this->exists($field)) {
+                $normalized[$field] = $this->boolean($field);
+            }
+        }
+
+        $this->merge($normalized);
     }
 }

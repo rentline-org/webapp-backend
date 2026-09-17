@@ -100,7 +100,7 @@ class DocumentRepository implements DocumentRepositoryInterface
             ]);
 
         if (! empty($filters['search'])) {
-            $search = '%'.trim($filters['search']).'%';
+            $search = '%' . trim($filters['search']) . '%';
 
             $query->where(function (Builder $query) use ($search): void {
                 $query->whereLike('title', $search)
@@ -110,6 +110,22 @@ class DocumentRepository implements DocumentRepositoryInterface
                     ->orWhereHas('property', fn (Builder $query) => $query->whereLike('title', $search))
                     ->orWhereHas('unit', fn (Builder $query) => $query->whereLike('name', $search))
                     ->orWhereHas('parties', fn (Builder $query) => $query->whereLike('name_snapshot', $search));
+            });
+        }
+
+        if (isset($filters['assigned_scope'])) {
+            $scope = $filters['assigned_scope'];
+            $query->where(function (Builder $query) use ($scope): void {
+                $query->whereIn('property_id', $scope['broad_property_ids'])
+                    ->orWhereIn('unit_id', $scope['unit_ids'])
+                    ->orWhereHas('properties', fn (Builder $query) => $query
+                        ->whereIn('properties.id', $scope['broad_property_ids']))
+                    ->orWhereHas('units', fn (Builder $query) => $query
+                        ->whereIn('units.id', $scope['unit_ids'])
+                        ->orWhereIn('units.property_id', $scope['broad_property_ids']))
+                    ->orWhereHas('leases', fn (Builder $query) => $query
+                        ->whereIn('leases.unit_id', $scope['unit_ids'])
+                        ->orWhereIn('leases.property_id', $scope['broad_property_ids']));
             });
         }
 
@@ -155,6 +171,15 @@ class DocumentRepository implements DocumentRepositoryInterface
             $query->whereHas('parties', fn (Builder $query) => $query->where('role', $filters['party_role']));
         }
 
+        if (! empty($filters['shared_with_user_id'])) {
+            $query->whereHas(
+                'shares',
+                fn (Builder $query) => $query
+                    ->active()
+                    ->where('user_id', $filters['shared_with_user_id']),
+            );
+        }
+
         if (! empty($filters['expires_from'])) {
             $query->whereDate('expires_on', '>=', $filters['expires_from']);
         }
@@ -171,7 +196,19 @@ class DocumentRepository implements DocumentRepositoryInterface
 
         match ($filters['signature_status'] ?? null) {
             'signed' => $query->where('is_signed', true),
-            'pending' => $query->where('requires_signature', true)->where('is_signed', false),
+            'declined' => $query
+                ->where('requires_signature', true)
+                ->where('is_signed', false)
+                ->whereHas('currentVersion.signers', fn (Builder $query) => $query->where('status', 'declined')),
+            'partially_signed' => $query
+                ->where('requires_signature', true)
+                ->where('is_signed', false)
+                ->whereHas('currentVersion.signers', fn (Builder $query) => $query->whereIn('status', ['signed', 'waived']))
+                ->whereDoesntHave('currentVersion.signers', fn (Builder $query) => $query->where('status', 'declined')),
+            'pending' => $query
+                ->where('requires_signature', true)
+                ->where('is_signed', false)
+                ->whereDoesntHave('currentVersion.signers', fn (Builder $query) => $query->whereIn('status', ['signed', 'waived', 'declined'])),
             'not_required' => $query->where('requires_signature', false),
             default => null,
         };

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OrganizationMemberStatus;
 use App\Models\Scopes\OrganizationScope;
 use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Database\Eloquent\Model;
@@ -21,16 +22,6 @@ class DocumentKind extends Model
         'default_requires_signature',
         'is_active',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'allowed_scopes' => 'array',
-            'supports_expiry' => 'boolean',
-            'default_requires_signature' => 'boolean',
-            'is_active' => 'boolean',
-        ];
-    }
 
     public function organization(): BelongsTo
     {
@@ -54,13 +45,45 @@ class DocumentKind extends Model
         $query = parent::resolveRouteBindingQuery($query, $value, $field);
         $organizationId = app(ActiveOrganizationContext::class)->id();
 
-        return $organizationId === null
-            ? $query->whereRaw('1 = 0')
-            : $query->where($this->qualifyColumn('organization_id'), $organizationId);
+        if ($organizationId === null) {
+            $headerOrganizationId = filter_var(
+                request()->header('X-Organization-Id'),
+                FILTER_VALIDATE_INT,
+            );
+            $organizationId = $headerOrganizationId === false
+                ? null
+                : $headerOrganizationId;
+        }
+
+        $user = request()->user();
+
+        if (
+            $organizationId === null
+            || $organizationId < 1
+            || $user === null
+            || (! $user->isSuperAdmin() && ! $user->organizations()
+                ->whereKey($organizationId)
+                ->wherePivot('status', OrganizationMemberStatus::ACTIVE->value)
+                ->exists())
+        ) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where($this->qualifyColumn('organization_id'), $organizationId);
     }
 
     protected static function booted(): void
     {
         static::addGlobalScope(new OrganizationScope);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'allowed_scopes' => 'array',
+            'supports_expiry' => 'boolean',
+            'default_requires_signature' => 'boolean',
+            'is_active' => 'boolean',
+        ];
     }
 }

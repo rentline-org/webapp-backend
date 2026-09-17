@@ -62,6 +62,7 @@ class DocumentKindCatalog
             'allowed_scopes' => $profile['allowed_scopes'],
             'supports_expiry' => $profile['supports_expiry'],
             'default_requires_signature' => $profile['default_requires_signature'],
+            'required_parties' => $this->requiredParties($type),
             'capabilities' => $profile['capabilities'],
             'fields' => $profile['fields'],
             'is_system' => true,
@@ -72,7 +73,7 @@ class DocumentKindCatalog
     private function customPayload(DocumentKind $kind, string $locale): array
     {
         return [
-            'key' => 'custom:'.$kind->key,
+            'key' => 'custom:' . $kind->key,
             'type' => DocumentType::CUSTOM->value,
             'custom_kind_id' => $kind->id,
             'label' => $kind->localizedLabel($locale),
@@ -82,6 +83,7 @@ class DocumentKindCatalog
             'allowed_scopes' => $kind->allowed_scopes,
             'supports_expiry' => $kind->supports_expiry,
             'default_requires_signature' => $kind->default_requires_signature,
+            'required_parties' => [],
             'capabilities' => [
                 'parties' => true,
                 'signers' => true,
@@ -176,6 +178,24 @@ class DocumentKindCatalog
             'fields' => $fields,
             'capabilities' => $capabilities,
         ];
+    }
+
+    /** @return list<string> */
+    private function requiredParties(DocumentType $type): array
+    {
+        return match ($type) {
+            DocumentType::LEASE => ['tenant', 'landlord'],
+            DocumentType::LEASE_ADDENDUM => ['tenant'],
+            DocumentType::PROPERTY_MANAGEMENT_AGREEMENT => ['owner', 'manager'],
+            DocumentType::BROKERAGE_AUTHORIZATION => ['owner', 'broker'],
+            DocumentType::INSPECTION_REPORT => ['inspector'],
+            DocumentType::INSURANCE_POLICY => ['insurer'],
+            DocumentType::SERVICE_CONTRACT => ['vendor'],
+            DocumentType::OWNERSHIP_RECORD => ['owner'],
+            DocumentType::GENERIC,
+            DocumentType::COMPLIANCE_CERTIFICATE,
+            DocumentType::CUSTOM => [],
+        };
     }
 
     private function activeOrganizationId(): int

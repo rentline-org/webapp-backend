@@ -35,6 +35,7 @@ Route::group(['prefix' => 'v1', 'middleware' => ['auth:sanctum']], function () {
     Route::post('documents/{document}/shares', [DocumentShareController::class, 'store'])->name('documents.shares.store');
     Route::delete('documents/{document}/shares/{share}', [DocumentShareController::class, 'destroy'])->name('documents.shares.destroy');
     Route::get('documents/{document}/audit-events', [DocumentAuditEventController::class, 'index'])->name('documents.audit-events.index');
+    Route::post('documents/{document}/activate', [DocumentController::class, 'activate'])->name('documents.activate');
     Route::post('documents/{document}/archive', [DocumentController::class, 'archive'])->name('documents.archive');
     Route::apiResource('documents', DocumentController::class)->scoped();
 });

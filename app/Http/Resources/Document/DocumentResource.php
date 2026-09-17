@@ -43,7 +43,7 @@ class DocumentResource extends JsonResource
             'effective_on' => $this->effective_on?->toDateString(),
             'expires_on' => $this->expires_on?->toDateString(),
             'expiry_status' => $this->expiryStatus(),
-            'details' => $this->metadata ?? [],
+            'details' => $canManage ? ($this->metadata ?? []) : [],
             'supersedes_document_id' => $this->supersedes_document_id,
             'property_id' => $this->property_id,
             'property' => $this->property ? [
@@ -102,10 +102,14 @@ class DocumentResource extends JsonResource
                 'status' => $signer->status->value,
                 'signed_at' => $signer->signed_at?->toIso8601String(),
             ])->values(),
-            'uploaded_by' => $this->uploaded_by,
-            'uploader' => $this->uploader ? ['id' => $this->uploader->id, 'name' => $this->uploader->name] : null,
-            'signed_by' => $this->signed_by,
-            'signer' => $this->signer ? ['id' => $this->signer->id, 'name' => $this->signer->name] : null,
+            'uploaded_by' => $canManage ? $this->uploaded_by : null,
+            'uploader' => $canManage && $this->uploader
+                ? ['id' => $this->uploader->id, 'name' => $this->uploader->name]
+                : null,
+            'signed_by' => $canManage ? $this->signed_by : null,
+            'signer' => $canManage && $this->signer
+                ? ['id' => $this->signer->id, 'name' => $this->signer->name]
+                : null,
             'lease' => $this->lease ? LeaseResource::make($this->lease) : null,
             'files' => $this->versionFiles($currentVersion, $canManage),
             'current_version' => $currentVersion ? $this->versionPayload($currentVersion, $canManage) : null,
@@ -120,6 +124,7 @@ class DocumentResource extends JsonResource
                 : [],
             'capabilities' => [
                 'can_update' => $canManage,
+                'can_activate' => $canManage && $this->lifecycle->value === 'draft',
                 'can_archive' => $canManage && $this->lifecycle->value !== 'archived',
                 'can_manage_signatures' => $canManage,
                 'can_share' => $canManage,
@@ -139,7 +144,9 @@ class DocumentResource extends JsonResource
             'id' => $version->id,
             'version_number' => $version->version_number,
             'notes' => $version->notes,
-            'creator' => $version->creator ? ['id' => $version->creator->id, 'name' => $version->creator->name] : null,
+            'creator' => $canManage && $version->creator
+                ? ['id' => $version->creator->id, 'name' => $version->creator->name]
+                : null,
             'files' => $this->versionFiles($version, $canManage),
             'finalized_at' => $version->finalized_at?->toIso8601String(),
             'created_at' => $version->created_at?->toIso8601String(),
@@ -228,6 +235,13 @@ class DocumentResource extends JsonResource
         }
         if ($signers->contains(fn ($signer): bool => $signer->status === DocumentSignerStatus::DECLINED)) {
             return 'declined';
+        }
+        if ($signers->contains(fn ($signer): bool => in_array(
+            $signer->status,
+            [DocumentSignerStatus::SIGNED, DocumentSignerStatus::WAIVED],
+            true,
+        ))) {
+            return 'partially_signed';
         }
 
         return 'pending';

@@ -6,6 +6,7 @@ use App\Enums\LeaseFinancialTermCalculation;
 use App\Enums\LeaseFinancialTermFrequency;
 use App\Enums\LeaseFinancialTermType;
 use App\Enums\LeasePartyRole;
+use App\Enums\RentalGuaranteeType;
 use App\Models\Lease;
 use App\Services\Organization\ActiveOrganizationContext;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -14,9 +15,7 @@ use Illuminate\Validation\Rule;
 
 class RenewLeaseRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
+    /** Determine if the user is authorized to make this request. */
     public function authorize(): bool
     {
         $lease = $this->route('lease');
@@ -39,6 +38,8 @@ class RenewLeaseRequest extends FormRequest
             'ends_on' => ['required', 'date', 'after:starts_on'],
             'title' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'currency' => ['sometimes', 'nullable', 'string', 'size:3'],
+            'guarantee_type' => ['sometimes', 'nullable', Rule::enum(RentalGuaranteeType::class)],
             'parties' => ['sometimes', 'array', 'max:25'],
             'parties.*.contact_id' => ['required', 'integer', $contactExists],
             'parties.*.role' => ['required', Rule::enum(LeasePartyRole::class)],
@@ -50,7 +51,10 @@ class RenewLeaseRequest extends FormRequest
             'financial_terms.*.percentage' => ['sometimes', 'nullable', 'numeric', 'gt:0', 'lte:100'],
             'financial_terms.*.currency' => ['sometimes', 'nullable', 'string', 'size:3'],
             'financial_terms.*.frequency' => ['sometimes', Rule::enum(LeaseFinancialTermFrequency::class)],
+            'financial_terms.*.calculation_basis' => ['sometimes', 'nullable', 'string', 'max:100'],
             'financial_terms.*.due_day' => ['sometimes', 'nullable', 'integer', 'between:1,31'],
+            'financial_terms.*.payer_contact_id' => ['sometimes', 'nullable', 'integer', $contactExists],
+            'financial_terms.*.payee_contact_id' => ['sometimes', 'nullable', 'integer', $contactExists],
             'financial_terms.*.effective_from' => ['sometimes', 'nullable', 'date'],
             'financial_terms.*.effective_to' => ['sometimes', 'nullable', 'date'],
             'financial_terms.*.is_liability' => ['sometimes', 'boolean'],
